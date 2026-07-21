@@ -15,7 +15,13 @@ export default function LoginPage() {
     event.preventDefault(); setLoading(true); setError(""); setMessage("");
     const result = mode === "login"
       ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
+      : await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          },
+        });
     setLoading(false);
     if (result.error) setError(result.error.message);
     else if (mode === "register" && !result.data.session) setMessage("Sprawdź skrzynkę e-mail i potwierdź rejestrację.");

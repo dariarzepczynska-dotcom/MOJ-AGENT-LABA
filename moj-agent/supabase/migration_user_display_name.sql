@@ -10,7 +10,8 @@ begin
     update public.user_profiles set display_name = name
     where display_name is null and name is not null;
   end if;
-end $$;
+end;
+$$;
 
 create or replace function public.create_profile_for_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
