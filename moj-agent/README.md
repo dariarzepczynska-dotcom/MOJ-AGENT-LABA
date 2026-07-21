@@ -33,4 +33,9 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
+Set the Vercel Root Directory to `moj-agent` and keep the framework build,
+output, and install commands on their automatically detected defaults. Configure
+`GOOGLE_GENERATIVE_AI_API_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+`NEXT_PUBLIC_SUPABASE_URL` as Vercel environment variables.
+
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
