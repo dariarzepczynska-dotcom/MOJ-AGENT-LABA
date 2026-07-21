@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const links = [
   { href: "/", icon: "HOME", label: "Dashboard" },
@@ -69,6 +70,7 @@ export function AppNavigation() {
           </Link>
         );
       })}
+      <button type="button" onClick={() => void supabase.auth.signOut()} className="mt-auto rounded-lg border border-red-900/60 px-3 py-2.5 text-sm text-red-300 hover:bg-red-950/40">Wyloguj</button>
     </div>
   );
 

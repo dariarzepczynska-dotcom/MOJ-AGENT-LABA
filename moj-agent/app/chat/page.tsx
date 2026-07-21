@@ -4,6 +4,7 @@ import { type UIMessage, useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "../components/AuthProvider";
 import { ImageAttachmentPreview } from "../components/ImageAttachmentPreview";
 import { MessageWithSources } from "../components/MessageWithSources";
 import { useImageAttachment } from "../lib/image-attachments";
@@ -68,12 +69,11 @@ type DatabaseMessage = {
 type UserPreferences = Record<string, string>;
 type UserProfile = {
   id: string;
-  name: string | null;
+  display_name: string | null;
   preferences: UserPreferences | null;
 };
 
 const databaseTimeoutMs = 6000;
-const userIdStorageKey = "user_id";
 
 function getMessageText(message: { parts: Array<{ type: string; text?: string }> }) {
   return message.parts
@@ -105,6 +105,7 @@ function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = databaseTimeoutMs) 
 }
 
 export default function Home() {
+  const { user, accessToken } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const submittedModeRef = useRef<ChatMode>("casual");
   const submittedModelRef = useRef<ChatModel>("flash");
@@ -144,15 +145,13 @@ export default function Home() {
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
         body: {
           mode,
           model,
-          userId: userProfile?.id ?? null,
-          userName: userProfile?.name ?? null,
-          userPreferences: userProfile?.preferences ?? {},
         },
       }),
-    [mode, model, userProfile],
+    [mode, model, accessToken],
   );
   const { messages, sendMessage, setMessages, status, error } = useChat({
     transport,
@@ -181,15 +180,10 @@ export default function Home() {
 
     const loadUserProfile = async () => {
       setIsLoadingProfile(true);
-      let userId = "";
+      const userId = user?.id ?? "";
 
       try {
-        userId = window.localStorage.getItem(userIdStorageKey) ?? "";
-
-        if (!userId) {
-          userId = crypto.randomUUID();
-          window.localStorage.setItem(userIdStorageKey, userId);
-        }
+        if (!userId) return;
 
         const now = new Date().toISOString();
         await withTimeout(
@@ -208,7 +202,7 @@ export default function Home() {
         const { data, error } = await withTimeout(
           supabase
             .from("user_profiles")
-            .select("id, name, preferences")
+            .select("id, display_name, preferences")
             .eq("id", userId)
             .maybeSingle(),
         );
@@ -219,13 +213,13 @@ export default function Home() {
 
         if (error) {
           console.error("Nie udalo sie pobrac profilu uzytkownika:", error);
-          setUserProfile({ id: userId, name: null, preferences: {} });
+          setUserProfile({ id: userId, display_name: null, preferences: {} });
           return;
         }
 
         setUserProfile({
           id: userId,
-          name: typeof data?.name === "string" ? data.name : null,
+          display_name: typeof data?.display_name === "string" ? data.display_name : null,
           preferences:
             data?.preferences && typeof data.preferences === "object"
               ? (data.preferences as UserPreferences)
@@ -234,7 +228,7 @@ export default function Home() {
       } catch (error) {
         console.error("Nie udalo sie wczytac profilu uzytkownika:", error);
         if (isMounted && userId) {
-          setUserProfile({ id: userId, name: null, preferences: {} });
+          setUserProfile({ id: userId, display_name: null, preferences: {} });
         }
       } finally {
         if (isMounted) {
@@ -248,7 +242,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     setAssistantMessageModes((currentModes) => {
@@ -292,7 +286,7 @@ export default function Home() {
     conversationPromiseRef.current = Promise.resolve(
       supabase
       .from("conversations")
-      .insert({ title: createConversationTitle(firstMessage) })
+      .insert({ title: createConversationTitle(firstMessage), user_id: user?.id })
       .select("id")
       .single()
       .then(({ data, error }) => {
@@ -308,7 +302,7 @@ export default function Home() {
     );
 
     return conversationPromiseRef.current;
-  }, []);
+  }, [user]);
 
   const saveMessageInBackground = useCallback((message: SavedMessage) => {
     const content = message.content.trim();
@@ -342,7 +336,8 @@ export default function Home() {
         const { error: updateError } = await supabase
           .from("conversations")
           .update(conversationUpdates)
-          .eq("id", conversationId);
+          .eq("id", conversationId)
+          .eq("user_id", user?.id ?? "");
 
         if (updateError) {
           console.error(
@@ -358,7 +353,7 @@ export default function Home() {
         console.error("Nie udało się zapisać wiadomości w Supabase:", error);
       }
     });
-  }, [ensureConversation]);
+  }, [ensureConversation, user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -375,10 +370,12 @@ export default function Home() {
               .from("conversations")
               .select("id")
               .eq("id", requestedConversationId)
+              .eq("user_id", user?.id ?? "")
               .maybeSingle()
           : supabase
               .from("conversations")
               .select("id")
+              .eq("user_id", user?.id ?? "")
               .order("updated_at", { ascending: false })
               .limit(1)
               .maybeSingle();
@@ -461,7 +458,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, [setMessages]);
+  }, [setMessages, user]);
 
   useEffect(() => {
     if (isLoading) {
@@ -485,7 +482,7 @@ export default function Home() {
     if (
       isLoadingProfile ||
       isLoadingConversation ||
-      userProfile?.name ||
+      userProfile?.display_name ||
       messages.length > 0 ||
       askedForNameRef.current
     ) {
@@ -511,7 +508,7 @@ export default function Home() {
     isLoadingProfile,
     messages.length,
     setMessages,
-    userProfile?.name,
+    userProfile?.display_name,
   ]);
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -557,14 +554,14 @@ export default function Home() {
     conversationIdRef.current = null;
     conversationPromiseRef.current = null;
     conversationHasUserMessageRef.current = false;
-    askedForNameRef.current = Boolean(userProfile?.name);
+    askedForNameRef.current = Boolean(userProfile?.display_name);
     savedMessageIdsRef.current.clear();
 
     const now = new Date().toISOString();
     const conversationPromise = Promise.resolve(
       supabase
       .from("conversations")
-      .insert({ title: "Nowa rozmowa", updated_at: now })
+      .insert({ title: "Nowa rozmowa", updated_at: now, user_id: user?.id })
       .select("id")
       .single()
       .then(({ data, error }) => {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "../../components/AuthProvider";
 
 type ConversationRow = {
   id: string;
@@ -58,6 +59,7 @@ function formatTime(value: string | null | undefined) {
 }
 
 export default function ConversationPreviewPage() {
+  const { user } = useAuth();
   const params = useParams<{ id: string }>();
   const conversationId = useMemo(() => {
     const rawId = params?.id;
@@ -84,9 +86,10 @@ export default function ConversationPreviewPage() {
         const { data: conversationData, error: conversationError } =
           await supabase
             .from("conversations")
-            .select("id, title, created_at, updated_at")
-            .eq("id", conversationId)
-            .maybeSingle();
+              .select("id, title, created_at, updated_at")
+              .eq("id", conversationId)
+              .eq("user_id", user?.id ?? "")
+              .maybeSingle();
 
         if (!isMounted) {
           return;
@@ -136,7 +139,7 @@ export default function ConversationPreviewPage() {
     return () => {
       isMounted = false;
     };
-  }, [conversationId]);
+  }, [conversationId, user]);
 
   const title = cleanText(conversation?.title) || "Nowa rozmowa";
 

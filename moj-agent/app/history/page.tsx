@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { MouseEvent, useEffect, useMemo, useState } from "react";
+import { MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "../components/AuthProvider";
 
 type ConversationRow = {
   id: string;
@@ -128,6 +129,7 @@ function highlight(text: string, query: string) {
 }
 
 export default function HistoryPage() {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<ConversationCard[]>([]);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -135,7 +137,7 @@ export default function HistoryPage() {
   const [toast, setToast] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     setIsLoading(true);
     setError("");
 
@@ -145,6 +147,7 @@ export default function HistoryPage() {
           supabase
             .from("conversations")
             .select("id, title, created_at, updated_at")
+            .eq("user_id", user?.id ?? "")
             .order("updated_at", { ascending: false }),
         );
 
@@ -206,7 +209,7 @@ export default function HistoryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -214,7 +217,7 @@ export default function HistoryPage() {
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [loadConversations]);
 
   const filteredConversations = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("pl-PL");
@@ -261,7 +264,8 @@ export default function HistoryPage() {
       const { error: conversationError } = await supabase
         .from("conversations")
         .delete()
-        .eq("id", conversationId);
+        .eq("id", conversationId)
+        .eq("user_id", user?.id ?? "");
 
       if (conversationError) {
         throw conversationError;

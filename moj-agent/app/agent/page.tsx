@@ -2,6 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useAuth } from "../components/AuthProvider";
 import type { UIMessage } from "ai";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ImageAttachmentPreview } from "../components/ImageAttachmentPreview";
@@ -222,6 +223,7 @@ function ToolTimeline({
 }
 
 export default function AgentPage() {
+  const { accessToken } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const requestStartRef = useRef<number | null>(null);
   const activeAssistantIdRef = useRef<string | null>(null);
@@ -245,12 +247,13 @@ export default function AgentPage() {
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
         body: {
           mode: "agent",
           model: "flash",
         },
       }),
-    [],
+    [accessToken],
   );
   const { messages, sendMessage, setMessages, status } = useChat({ transport });
   const isLoading = status === "submitted" || status === "streaming";

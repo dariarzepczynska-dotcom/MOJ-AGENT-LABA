@@ -1,9 +1,7 @@
 -- Supabase schema for Moj Agent.
 -- Run this file in Supabase SQL Editor.
 --
--- The app currently uses a browser anon client and a locally generated
--- user_profiles.id from localStorage, not Supabase Auth. RLS is disabled for
--- the workshop/local setup. Enable and tighten policies when real auth is added.
+-- Authentication and data ownership are based on Supabase Auth (auth.uid()).
 
 create extension if not exists pgcrypto;
 create extension if not exists vector;
@@ -19,8 +17,8 @@ end;
 $$;
 
 create table if not exists public.user_profiles (
-  id uuid primary key,
-  name text,
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
   preferences jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -28,7 +26,7 @@ create table if not exists public.user_profiles (
 
 create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.user_profiles(id) on delete set null,
+  user_id uuid not null references auth.users(id) on delete cascade,
   title text not null default 'Nowa rozmowa',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -44,6 +42,7 @@ create table if not exists public.messages (
 
 create table if not exists public.documents (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
   content text not null,
   embedding vector(768) not null,
@@ -51,7 +50,7 @@ create table if not exists public.documents (
   created_at timestamptz not null default now()
 );
 
-create index if not exists documents_title_idx on public.documents (title);
+create index if not exists documents_user_id_title_idx on public.documents (user_id, title);
 
 create or replace function public.match_documents(
   query_embedding vector(768),
@@ -75,7 +74,8 @@ as $$
     documents.metadata,
     1 - (documents.embedding <=> query_embedding) as similarity
   from public.documents
-  where 1 - (documents.embedding <=> query_embedding) > match_threshold
+  where documents.user_id = auth.uid()
+    and 1 - (documents.embedding <=> query_embedding) > match_threshold
   order by documents.embedding <=> query_embedding
   limit match_count;
 $$;
@@ -97,23 +97,40 @@ create trigger set_user_profiles_updated_at
 before update on public.user_profiles
 for each row execute function public.set_updated_at();
 
+create or replace function public.create_profile_for_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.user_profiles (id, display_name, preferences)
+  values (new.id, null, '{}'::jsonb)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists create_profile_after_signup on auth.users;
+create trigger create_profile_after_signup
+after insert on auth.users for each row execute function public.create_profile_for_new_user();
+
 drop trigger if exists set_conversations_updated_at on public.conversations;
 create trigger set_conversations_updated_at
 before update on public.conversations
 for each row execute function public.set_updated_at();
 
-alter table public.user_profiles disable row level security;
-alter table public.conversations disable row level security;
-alter table public.messages disable row level security;
-alter table public.documents disable row level security;
+alter table public.user_profiles enable row level security;
+alter table public.conversations enable row level security;
+alter table public.messages enable row level security;
+alter table public.documents enable row level security;
 
--- Optional stricter policy direction for later Supabase Auth:
--- 1. Store auth.uid() in conversations.user_id.
--- 2. Enable RLS and add authenticated-only policies:
---    using (user_id = auth.uid()) / with check (user_id = auth.uid()).
--- 3. For messages, authorize through the parent conversation:
---    exists (
---      select 1 from public.conversations c
---      where c.id = messages.conversation_id
---        and c.user_id = auth.uid()
---    )
+drop policy if exists "own profile" on public.user_profiles;
+create policy "own profile" on public.user_profiles for all to authenticated
+using (id = auth.uid()) with check (id = auth.uid());
+drop policy if exists "own conversations" on public.conversations;
+create policy "own conversations" on public.conversations for all to authenticated
+using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "own messages" on public.messages;
+create policy "own messages" on public.messages for all to authenticated
+using (exists (select 1 from public.conversations c where c.id = conversation_id and c.user_id = auth.uid()))
+with check (exists (select 1 from public.conversations c where c.id = conversation_id and c.user_id = auth.uid()));
+drop policy if exists "own documents" on public.documents;
+create policy "own documents" on public.documents for all to authenticated
+using (user_id = auth.uid()) with check (user_id = auth.uid());

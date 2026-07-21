@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { tool } from "ai";
 import { z } from "zod";
 import { generateEmbedding } from "@/lib/embeddings";
@@ -92,9 +92,9 @@ W tej odpowiedzi reguły poniżej mają pierwszeństwo przed formatem persony:
 - Na końcu dodaj źródło bez nawiasów kwadratowych, np. "📎 Źródło: Cennik 2026".
 - Jeśli nie ma trafnego wyniku, zastosuj dokładnie regułę odmowy z promptu bazy wiedzy.`;
 
-export async function findKnowledge(query: string) {
+export async function findKnowledge(query: string, authenticatedClient: SupabaseClient) {
   const embedding = await generateEmbedding(query.trim());
-  const supabase = getSupabaseClient();
+  const supabase = authenticatedClient;
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: embedding,
     match_threshold: 0.5,
@@ -144,20 +144,7 @@ export async function findKnowledge(query: string) {
   };
 }
 
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Brakuje konfiguracji Supabase.");
-  }
-
-  return createClient(url, key);
-}
-
-export const searchKnowledge = tool({
+export function createSearchKnowledge(authenticatedClient: SupabaseClient) { return tool({
   description: `Wyszukuje informacje w bazie wiedzy firmy (cenniki, FAQ, regulaminy, oferty).
 Używaj ZAWSZE, gdy użytkownik pyta o:
 - ceny, pakiety, koszty
@@ -172,7 +159,7 @@ Używaj ZAWSZE, gdy użytkownik pyta o:
   }),
   execute: async ({ query }) => {
     try {
-      const searchResult = await findKnowledge(query);
+      const searchResult = await findKnowledge(query, authenticatedClient);
 
       if (searchResult.total_found === 0) {
         return {
@@ -195,4 +182,4 @@ Używaj ZAWSZE, gdy użytkownik pyta o:
       };
     }
   },
-});
+}); }

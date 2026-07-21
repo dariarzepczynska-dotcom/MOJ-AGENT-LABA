@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 
 type SavedDocument = {
   title: string;
@@ -43,7 +44,7 @@ export default function UploadPage() {
 
   const loadDocuments = useCallback(async () => {
     try {
-      const response = await fetch("/api/upload-knowledge", { cache: "no-store" });
+      const response = await authFetch("/api/upload-knowledge", { cache: "no-store" });
 
       if (!response.ok) throw new Error(await readError(response));
 
@@ -78,7 +79,7 @@ export default function UploadPage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/upload-knowledge", {
+      const response = await authFetch("/api/upload-knowledge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title.trim(), content: content.trim() }),
@@ -132,7 +133,7 @@ export default function UploadPage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/upload-knowledge", {
+      const response = await authFetch("/api/upload-knowledge", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: documentTitle }),

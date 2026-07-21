@@ -14,9 +14,10 @@ import {
 } from "../../lib/react-tools";
 import {
   knowledgeBasePrompt,
-  searchKnowledge,
+  createSearchKnowledge,
   shouldSearchKnowledge,
 } from "../../lib/knowledge-tool";
+import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 
 if (process.env.ENABLE_SEARCH_GROUNDING === "true") {
   console.warn(
@@ -64,9 +65,12 @@ ${knowledgeBasePrompt}
 - Jesli po 3 nieudanych probach nie masz danych - powiedz wprost czego brakuje.`;
 
 export async function POST(req: Request) {
+  const auth = await getAuthenticatedSupabase(req);
+  if (!auth) return new Response("Brak autoryzacji.", { status: 401 });
   const { messages } = await req.json();
   const forceKnowledgeSearch = shouldSearchKnowledge(messages);
   const modelMessages = await convertToModelMessages(messages);
+  const searchKnowledge = createSearchKnowledge(auth.client);
 
   const result = streamText({
     model: google("gemini-3.1-flash-lite"),

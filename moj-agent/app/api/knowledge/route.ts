@@ -1,6 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { findKnowledge } from "@/app/lib/knowledge-tool";
+import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 
 type DocumentChunk = {
   id: string;
@@ -10,29 +10,19 @@ type DocumentChunk = {
   created_at: string | null;
 };
 
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Brakuje konfiguracji Supabase.");
-  }
-
-  return createClient(url, key);
-}
-
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Nieznany błąd serwera.";
 }
 
 export async function GET(request: Request) {
   try {
+    const auth = await getAuthenticatedSupabase(request);
+    if (!auth) return NextResponse.json({ error: "Brak autoryzacji." }, { status: 401 });
     const title = new URL(request.url).searchParams.get("title")?.trim();
-    let query = getSupabaseClient()
+    let query = auth.client
       .from("documents")
       .select("id, title, content, metadata, created_at")
+      .eq("user_id", auth.user.id)
       .order("created_at", { ascending: false });
 
     if (title) {
@@ -78,6 +68,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await getAuthenticatedSupabase(request);
+    if (!auth) return NextResponse.json({ error: "Brak autoryzacji." }, { status: 401 });
     const body = (await request.json()) as { query?: unknown };
     const query = typeof body.query === "string" ? body.query.trim() : "";
 
@@ -88,7 +80,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(await findKnowledge(query));
+    return NextResponse.json(await findKnowledge(query, auth.client));
   } catch (error) {
     return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
   }

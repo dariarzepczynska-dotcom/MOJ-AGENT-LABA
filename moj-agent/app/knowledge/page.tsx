@@ -1,5 +1,7 @@
 "use client";
 
+import { authFetch } from "@/lib/auth-fetch";
+
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 type DocumentSummary = {
@@ -57,7 +59,7 @@ export default function KnowledgePage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/knowledge", { cache: "no-store" });
+        const response = await authFetch("/api/knowledge", { cache: "no-store" });
       if (!response.ok) throw new Error(await readError(response));
 
       const data = (await response.json()) as {
@@ -95,7 +97,7 @@ export default function KnowledgePage() {
     setError(null);
 
     try {
-      const response = await fetch(
+        const response = await authFetch(
         `/api/knowledge?title=${encodeURIComponent(title)}`,
         { cache: "no-store" },
       );
@@ -124,7 +126,7 @@ export default function KnowledgePage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/knowledge", {
+        const response = await authFetch("/api/knowledge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: query.trim() }),

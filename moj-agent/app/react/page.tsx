@@ -2,6 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useAuth } from "../components/AuthProvider";
 import type { UIMessage } from "ai";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { MessageWithSources } from "../components/MessageWithSources";
@@ -365,6 +366,7 @@ function ProgressBar({ usedTools }: { usedTools: number }) {
 }
 
 export default function ReactAgentPage() {
+  const { accessToken } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
   const [requestStartedAt, setRequestStartedAt] = useState<number | null>(null);
@@ -373,8 +375,9 @@ export default function ReactAgentPage() {
     () =>
       new DefaultChatTransport({
         api: "/api/react",
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       }),
-    [],
+    [accessToken],
   );
   const { messages, sendMessage, setMessages, status } = useChat({ transport });
   const isLoading = status === "submitted" || status === "streaming";

@@ -6,9 +6,10 @@ import { z } from "zod";
 import {
   knowledgeBasePrompt,
   knowledgeAnswerPrompt,
-  searchKnowledge,
+  createSearchKnowledge,
   shouldSearchKnowledge,
 } from "../../lib/knowledge-tool";
+import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 
 if (process.env.ENABLE_SEARCH_GROUNDING === "true") {
   console.warn(
@@ -161,15 +162,17 @@ function normalizePreferences(preferences: unknown): UserPreferences {
 
 function getPersonalizedSystemPrompt({
   mode,
-  userName,
+  displayName,
   userPreferences,
+  isNewConversation,
 }: {
   mode: unknown;
-  userName: unknown;
+  displayName: unknown;
   userPreferences: UserPreferences;
+  isNewConversation: boolean;
 }) {
   const basePrompt = `${getSystemPrompt(mode)}\n\n${knowledgeBasePrompt}`;
-  const name = typeof userName === "string" ? userName.trim() : "";
+  const name = typeof displayName === "string" ? displayName.trim() : "";
   const preferencesText = Object.entries(userPreferences)
     .map(([key, value]) => `- ${key}: ${value}`)
     .join("\n");
@@ -178,7 +181,8 @@ function getPersonalizedSystemPrompt({
     return `${basePrompt}
 
 Personalizacja:
-Uzytkownik ma na imie ${name}. Przywitaj go po imieniu, zwracaj sie do niego po imieniu i badz cieply oraz personalny - to Twoj staly uzytkownik.${
+Rozmawiasz z użytkownikiem: ${name}.
+${isNewConversation ? `Na początku tej rozmowy przywitaj go dokładnie: "Cześć, ${name}!"` : "Zwracaj się do użytkownika po imieniu naturalnie, bez powtarzania powitania w każdej odpowiedzi."}${
       preferencesText
         ? `\nZnane preferencje uzytkownika:\n${preferencesText}\nUzywaj tych preferencji naturalnie, gdy pomagaja w odpowiedzi.`
         : ""
@@ -188,8 +192,9 @@ Uzytkownik ma na imie ${name}. Przywitaj go po imieniu, zwracaj sie do niego po 
   return `${basePrompt}
 
 Personalizacja:
-To nowy uzytkownik. Na poczatku pierwszej rozmowy przywitaj sie krotko i zapytaj, jak ma na imie.
-Gdy uzytkownik poda imie, uzyj narzedzia saveUserName, zeby je zapamietac.
+Rozmawiasz z użytkownikiem: nieznany.
+Jeśli nie znasz imienia użytkownika, zapytaj grzecznie na początku rozmowy.
+Gdy użytkownik poda imię, zawsze użyj narzędzia updateUserName. Po udanym zapisie odpowiedz: "Miło Cię poznać, {imię}! Zapamiętam."
 Gdy uzytkownik poda trwala preferencje, np. miasto, ulubione jedzenie, styl pracy lub zainteresowania, uzyj narzedzia saveUserPreference.`;
 }
 
@@ -501,10 +506,10 @@ const generateImage = tool({
   },
 });
 
-function createUserProfileTools(userId: unknown) {
+function createUserProfileTools(userId: unknown, authenticatedClient?: ReturnType<typeof getSupabaseClient>) {
   const profileId = typeof userId === "string" ? userId.trim() : "";
 
-  const saveUserName = tool({
+  const updateUserName = tool({
     description:
       "Zapisuje imie uzytkownika w profilu. Uzywaj, gdy uzytkownik poda swoje imie, np. 'Mam na imie Pawel', 'Jestem Ania'.",
     inputSchema: z.object({
@@ -515,7 +520,7 @@ function createUserProfileTools(userId: unknown) {
         return { ok: false, error: "Brak user_id w zadaniu." };
       }
 
-      const supabase = getSupabaseClient();
+      const supabase = authenticatedClient ?? getSupabaseClient();
 
       if (!supabase) {
         return { ok: false, error: "Brak konfiguracji Supabase." };
@@ -525,7 +530,7 @@ function createUserProfileTools(userId: unknown) {
       const { error } = await supabase
         .from("user_profiles")
         .update({
-          name: normalizedName,
+          display_name: normalizedName,
           updated_at: new Date().toISOString(),
         })
         .eq("id", profileId);
@@ -538,7 +543,8 @@ function createUserProfileTools(userId: unknown) {
       return {
         ok: true,
         name: normalizedName,
-        message: `Zapamietalem imie: ${normalizedName}.`,
+        display_name: normalizedName,
+        message: `Miło Cię poznać, ${normalizedName}! Zapamiętam.`,
       };
     },
   });
@@ -559,7 +565,7 @@ function createUserProfileTools(userId: unknown) {
         return { ok: false, error: "Brak user_id w zadaniu." };
       }
 
-      const supabase = getSupabaseClient();
+      const supabase = authenticatedClient ?? getSupabaseClient();
 
       if (!supabase) {
         return { ok: false, error: "Brak konfiguracji Supabase." };
@@ -605,26 +611,40 @@ function createUserProfileTools(userId: unknown) {
   });
 
   return {
-    saveUserName,
+    updateUserName,
     saveUserPreference,
   };
 }
 
 export async function POST(req: Request) {
+  const auth = await getAuthenticatedSupabase(req);
+  if (!auth) return new Response("Brak autoryzacji.", { status: 401 });
   const {
     messages,
     mode = "casual",
     model = "flash",
     image,
-    userId,
-    userName,
-    userPreferences,
   } = await req.json();
   const forceKnowledgeSearch = shouldSearchKnowledge(messages);
   const normalizedImage = normalizeImage(image);
   const modelMessages = await convertToModelMessages(messages);
-  const normalizedUserPreferences = normalizePreferences(userPreferences);
-  const userProfileTools = createUserProfileTools(userId);
+  const authenticatedUserId = auth.user.id;
+  const { data: profile, error: profileError } = await auth.client
+    .from("user_profiles")
+    .select("display_name, preferences")
+    .eq("id", authenticatedUserId)
+    .maybeSingle();
+  if (profileError) return new Response("Nie udało się pobrać profilu.", { status: 500 });
+  if (!profile) {
+    const { error: createProfileError } = await auth.client
+      .from("user_profiles")
+      .insert({ id: authenticatedUserId, display_name: null, preferences: {} });
+    if (createProfileError) return new Response("Nie udało się utworzyć profilu.", { status: 500 });
+  }
+  const displayName = profile?.display_name ?? null;
+  const normalizedUserPreferences = normalizePreferences(profile?.preferences);
+  const userProfileTools = createUserProfileTools(authenticatedUserId, auth.client);
+  const searchKnowledge = createSearchKnowledge(auth.client);
 
   if (normalizedImage) {
     const lastUserMessage = [...modelMessages]
@@ -646,8 +666,9 @@ export async function POST(req: Request) {
     maxSteps: 3,
     system: `${getPersonalizedSystemPrompt({
       mode,
-      userName,
+      displayName,
       userPreferences: normalizedUserPreferences,
+      isNewConversation: Array.isArray(messages) && messages.filter((message) => message?.role === "user").length <= 1,
     })}${forceKnowledgeSearch ? `\n\n${knowledgeAnswerPrompt}` : ""}`,
     messages: modelMessages,
     tools: {
