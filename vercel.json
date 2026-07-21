@@ -1,7 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "installCommand": "npm ci --prefix moj-agent",
-  "buildCommand": "npm run build --prefix moj-agent",
-  "outputDirectory": "moj-agent/.next"
-}
