@@ -20,6 +20,7 @@ const links = [
   { href: "/agent", icon: "BOT", label: "Agent multi-tool" },
   { href: "/react", icon: "LOOP", label: "Agent ReAct" },
   { href: "/travel", icon: "MAP", label: "Asystent podrozy" },
+  { href: "/email-triage", icon: "MAIL", label: "📧 E-mail Triage" },
 ];
 
 function isActive(pathname: string, href: string) {
