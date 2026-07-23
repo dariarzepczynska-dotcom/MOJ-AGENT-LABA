@@ -3,7 +3,14 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
-import { FormEvent, ReactNode, useMemo, useState } from "react";
+import {
+  FormEvent,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../components/AuthProvider";
 
@@ -13,6 +20,14 @@ const examples = [
   "Wpływ pracy zdalnej na produktywność — badania i statystyki",
   "Rynek nieruchomości w Krakowie — ceny, trendy, prognozy",
 ];
+
+type SavedReport = {
+  id: string;
+  topic: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+};
 
 function getMessageText(message?: UIMessage) {
   return (
@@ -119,6 +134,10 @@ export default function ReportPage() {
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [savedReportId, setSavedReportId] = useState<string | null>(null);
+  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+  const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null);
+  const [isLoadingReports, setIsLoadingReports] = useState(true);
+  const [reportsError, setReportsError] = useState("");
   const transport = useMemo(
     () => new DefaultChatTransport({ api: "/api/report" }),
     [],
@@ -129,6 +148,41 @@ export default function ReportPage() {
     .reverse()
     .find((message) => message.role === "assistant");
   const report = getMessageText(reportMessage);
+
+  const loadSavedReports = useCallback(async () => {
+    if (!user) return;
+
+    setIsLoadingReports(true);
+    setReportsError("");
+
+    const { data, error: loadError } = await supabase
+      .from("reports")
+      .select("id, topic, content, created_at, updated_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (loadError) {
+      console.error("Nie udało się pobrać raportów z Supabase:", loadError);
+      setReportsError(
+        loadError.code === "42P01"
+          ? "Tabela reports nie istnieje. Uruchom migrację migration_reports.sql."
+          : "Nie udało się pobrać zapisanych raportów.",
+      );
+      setSavedReports([]);
+    } else {
+      setSavedReports((data ?? []) as SavedReport[]);
+    }
+
+    setIsLoadingReports(false);
+  }, [user]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadSavedReports();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadSavedReports]);
 
   const generate = (topic: string) => {
     const value = topic.trim();
@@ -173,6 +227,7 @@ export default function ReportPage() {
 
       setSavedReportId(savedReport.id as string);
       setSaveState("saved");
+      await loadSavedReports();
     } catch (saveError) {
       console.error("Nie udało się zapisać raportu w Supabase:", saveError);
       setSaveState("error");
@@ -300,6 +355,120 @@ export default function ReportPage() {
               <ReportMarkdown content={report} />
             </div>
           </section>
+        )}
+
+        <section className="mt-10 border-t border-[#203633] pt-8">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#67e8f9]">
+                Biblioteka
+              </p>
+              <h2 className="mt-2 text-2xl font-bold text-white">
+                Zapisane raporty
+              </h2>
+              <p className="mt-2 text-sm text-[#8fa7a2]">
+                Raporty zapisane na Twoim koncie w Supabase.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadSavedReports()}
+              disabled={isLoadingReports}
+              className="rounded-lg border border-[#31535a] px-4 py-2 text-sm font-semibold text-[#cffafe] transition hover:border-[#22d3ee] disabled:opacity-50"
+            >
+              {isLoadingReports ? "Odświeżanie…" : "↻ Odśwież"}
+            </button>
+          </div>
+
+          {reportsError && (
+            <p className="mt-5 rounded-xl border border-red-900/70 bg-red-950/30 px-5 py-4 text-sm text-red-200">
+              {reportsError}
+            </p>
+          )}
+
+          {isLoadingReports && savedReports.length === 0 && (
+            <div className="mt-5 rounded-xl border border-[#223a38] bg-[#09100f] px-5 py-8 text-center text-sm text-[#8fa7a2]">
+              Wczytywanie zapisanych raportów…
+            </div>
+          )}
+
+          {!isLoadingReports && !reportsError && savedReports.length === 0 && (
+            <div className="mt-5 rounded-xl border border-dashed border-[#31504b] bg-[#09100f] px-5 py-10 text-center">
+              <p className="font-semibold text-white">Nie masz jeszcze zapisanych raportów</p>
+              <p className="mt-2 text-sm text-[#8fa7a2]">
+                Wygeneruj raport i użyj przycisku „Zapisz w bazie”.
+              </p>
+            </div>
+          )}
+
+          {savedReports.length > 0 && (
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {savedReports.map((saved) => (
+                <button
+                  key={saved.id}
+                  type="button"
+                  onClick={() => setSelectedReport(saved)}
+                  className="group rounded-xl border border-[#223a38] bg-[#09100f] p-5 text-left transition hover:-translate-y-0.5 hover:border-[#22d3ee]/70 hover:bg-[#0b1919]"
+                >
+                  <p className="line-clamp-2 font-semibold leading-6 text-white">
+                    {saved.topic}
+                  </p>
+                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#8fa7a2]">
+                    {saved.content.replace(/[#*[\]()]/g, "").replace(/\s+/g, " ").trim()}
+                  </p>
+                  <div className="mt-4 flex items-center justify-between gap-3 text-xs">
+                    <span className="text-[#718781]">
+                      {new Intl.DateTimeFormat("pl-PL", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      }).format(new Date(saved.created_at))}
+                    </span>
+                    <span className="font-semibold text-[#67e8f9] group-hover:text-white">
+                      Otwórz raport →
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {selectedReport && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="saved-report-title"
+            className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-3 backdrop-blur-sm sm:p-6"
+            onClick={() => setSelectedReport(null)}
+          >
+            <div
+              className="mx-auto my-4 w-full max-w-4xl overflow-hidden rounded-2xl border border-[#27444a] bg-[#08100f] shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[#203633] bg-[#0b1514]/95 px-5 py-4 backdrop-blur sm:px-7">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#67e8f9]">
+                    Zapisany raport
+                  </p>
+                  <h2 id="saved-report-title" className="mt-1 truncate font-semibold text-white">
+                    {selectedReport.topic}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedReport(null)}
+                  aria-label="Zamknij raport"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#31535a] text-lg text-[#cffafe] transition hover:border-[#22d3ee] hover:bg-[#12302f]"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="px-5 py-7 sm:px-8 sm:py-10">
+                <ReportMarkdown content={selectedReport.content} />
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </main>
