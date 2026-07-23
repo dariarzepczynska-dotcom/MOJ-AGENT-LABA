@@ -138,6 +138,7 @@ export default function ReportPage() {
   const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
   const [reportsError, setReportsError] = useState("");
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const transport = useMemo(
     () => new DefaultChatTransport({ api: "/api/report" }),
     [],
@@ -232,6 +233,42 @@ export default function ReportPage() {
       console.error("Nie udało się zapisać raportu w Supabase:", saveError);
       setSaveState("error");
     }
+  };
+
+  const deleteReport = async (saved: SavedReport) => {
+    if (!user || deletingReportId) return;
+
+    const confirmed = window.confirm(
+      `Czy na pewno chcesz usunąć raport „${saved.topic}”? Tej operacji nie można cofnąć.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingReportId(saved.id);
+    setReportsError("");
+
+    const { error: deleteError } = await supabase
+      .from("reports")
+      .delete()
+      .eq("id", saved.id)
+      .eq("user_id", user.id);
+
+    if (deleteError) {
+      console.error("Nie udało się usunąć raportu z Supabase:", deleteError);
+      setReportsError("Nie udało się usunąć raportu. Spróbuj ponownie.");
+    } else {
+      setSavedReports((current) =>
+        current.filter((reportItem) => reportItem.id !== saved.id),
+      );
+      setSelectedReport((current) =>
+        current?.id === saved.id ? null : current,
+      );
+      if (savedReportId === saved.id) {
+        setSavedReportId(null);
+        setSaveState("idle");
+      }
+    }
+
+    setDeletingReportId(null);
   };
 
   return (
@@ -404,19 +441,23 @@ export default function ReportPage() {
           {savedReports.length > 0 && (
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               {savedReports.map((saved) => (
-                <button
+                <article
                   key={saved.id}
-                  type="button"
-                  onClick={() => setSelectedReport(saved)}
-                  className="group rounded-xl border border-[#223a38] bg-[#09100f] p-5 text-left transition hover:-translate-y-0.5 hover:border-[#22d3ee]/70 hover:bg-[#0b1919]"
+                  className="group flex flex-col rounded-xl border border-[#223a38] bg-[#09100f] p-5 transition hover:-translate-y-0.5 hover:border-[#22d3ee]/70 hover:bg-[#0b1919]"
                 >
-                  <p className="line-clamp-2 font-semibold leading-6 text-white">
-                    {saved.topic}
-                  </p>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#8fa7a2]">
-                    {saved.content.replace(/[#*[\]()]/g, "").replace(/\s+/g, " ").trim()}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between gap-3 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReport(saved)}
+                    className="flex-1 text-left"
+                  >
+                    <p className="line-clamp-2 font-semibold leading-6 text-white">
+                      {saved.topic}
+                    </p>
+                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#8fa7a2]">
+                      {saved.content.replace(/[#*[\]()]/g, "").replace(/\s+/g, " ").trim()}
+                    </p>
+                  </button>
+                  <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#203633] pt-4 text-xs">
                     <span className="text-[#718781]">
                       {new Intl.DateTimeFormat("pl-PL", {
                         day: "numeric",
@@ -424,11 +465,25 @@ export default function ReportPage() {
                         year: "numeric",
                       }).format(new Date(saved.created_at))}
                     </span>
-                    <span className="font-semibold text-[#67e8f9] group-hover:text-white">
-                      Otwórz raport →
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedReport(saved)}
+                        className="rounded-md px-2 py-1 font-semibold text-[#67e8f9] transition hover:bg-[#12302f] hover:text-white"
+                      >
+                        Otwórz →
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteReport(saved)}
+                        disabled={deletingReportId !== null}
+                        className="rounded-md border border-red-900/70 px-2 py-1 font-semibold text-red-300 transition hover:border-red-500 hover:bg-red-950/50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {deletingReportId === saved.id ? "Usuwanie…" : "🗑 Usuń"}
+                      </button>
+                    </div>
                   </div>
-                </button>
+                </article>
               ))}
             </div>
           )}
