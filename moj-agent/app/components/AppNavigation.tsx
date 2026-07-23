@@ -23,6 +23,7 @@ const links = [
   { href: "/report", icon: "RPT", label: "📊 Raporty" },
   { href: "/competitor", icon: "COMP", label: "🏢 Konkurencja" },
   { href: "/email-triage", icon: "MAIL", label: "📧 E-mail Triage" },
+  { href: "/generator-opisu-produktu", icon: "💍", label: "Kreator opisów" },
 ];
 
 function isActive(pathname: string, href: string) {
