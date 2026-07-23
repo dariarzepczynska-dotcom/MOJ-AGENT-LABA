@@ -21,6 +21,7 @@ const links = [
   { href: "/react", icon: "LOOP", label: "Agent ReAct" },
   { href: "/travel", icon: "MAP", label: "Asystent podrozy" },
   { href: "/report", icon: "RPT", label: "📊 Raporty" },
+  { href: "/competitor", icon: "COMP", label: "🏢 Konkurencja" },
   { href: "/email-triage", icon: "MAIL", label: "📧 E-mail Triage" },
 ];
 

@@ -4,6 +4,8 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
 import { FormEvent, ReactNode, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "../components/AuthProvider";
 
 const examples = [
   "Rynek AI w Polsce — trendy, firmy, prognozy na 2026",
@@ -109,8 +111,14 @@ function ReportMarkdown({ content }: { content: string }) {
 }
 
 export default function ReportPage() {
+  const { user } = useAuth();
   const [input, setInput] = useState("");
+  const [reportTopic, setReportTopic] = useState("");
   const [copied, setCopied] = useState(false);
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [savedReportId, setSavedReportId] = useState<string | null>(null);
   const transport = useMemo(
     () => new DefaultChatTransport({ api: "/api/report" }),
     [],
@@ -126,6 +134,9 @@ export default function ReportPage() {
     const value = topic.trim();
     if (!value || isLoading) return;
     setCopied(false);
+    setReportTopic(value);
+    setSaveState("idle");
+    setSavedReportId(null);
     void sendMessage({ text: value });
   };
 
@@ -138,6 +149,34 @@ export default function ReportPage() {
     await navigator.clipboard.writeText(report);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
+  };
+
+  const saveReport = async () => {
+    if (!report || !reportTopic || !user || isLoading || saveState === "saving") {
+      return;
+    }
+
+    setSaveState("saving");
+
+    try {
+      const { data: savedReport, error: saveError } = await supabase
+        .from("reports")
+        .insert({
+          user_id: user.id,
+          topic: reportTopic,
+          content: report,
+        })
+        .select("id")
+        .single();
+
+      if (saveError) throw saveError;
+
+      setSavedReportId(savedReport.id as string);
+      setSaveState("saved");
+    } catch (saveError) {
+      console.error("Nie udało się zapisać raportu w Supabase:", saveError);
+      setSaveState("error");
+    }
   };
 
   return (
@@ -224,15 +263,39 @@ export default function ReportPage() {
                   {isLoading ? "Agent uzupełnia treść…" : "Research i analiza zakończone"}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void copyReport()}
-                disabled={isLoading}
-                className="rounded-lg border border-[#31535a] bg-[#10201e] px-4 py-2 text-sm font-semibold text-[#cffafe] transition hover:border-[#22d3ee] hover:bg-[#12302f] disabled:opacity-50"
-              >
-                {copied ? "✓ Skopiowano" : "📋 Kopiuj do schowka"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void copyReport()}
+                  disabled={isLoading}
+                  className="rounded-lg border border-[#31535a] bg-[#10201e] px-4 py-2 text-sm font-semibold text-[#cffafe] transition hover:border-[#22d3ee] hover:bg-[#12302f] disabled:opacity-50"
+                >
+                  {copied ? "✓ Skopiowano" : "📋 Kopiuj do schowka"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveReport()}
+                  disabled={isLoading || saveState === "saving" || saveState === "saved"}
+                  className="rounded-lg border border-[#3b634d] bg-[#102319] px-4 py-2 text-sm font-semibold text-[#bbf7d0] transition hover:border-[#4ade80] hover:bg-[#153522] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saveState === "saving"
+                    ? "Zapisywanie..."
+                    : saveState === "saved"
+                      ? "✓ Zapisano w bazie"
+                      : "💾 Zapisz w bazie"}
+                </button>
+              </div>
             </div>
+            {saveState === "error" && (
+              <p className="border-b border-red-900/50 bg-red-950/30 px-5 py-3 text-sm text-red-200 sm:px-7">
+                Nie udało się zapisać raportu. Sprawdź połączenie z Supabase i spróbuj ponownie.
+              </p>
+            )}
+            {saveState === "saved" && savedReportId && (
+              <p className="border-b border-emerald-900/50 bg-emerald-950/20 px-5 py-3 text-sm text-emerald-200 sm:px-7">
+                Raport zapisano w dedykowanej bazie raportów.
+              </p>
+            )}
             <div className="px-5 py-7 sm:px-8 sm:py-10">
               <ReportMarkdown content={report} />
             </div>
