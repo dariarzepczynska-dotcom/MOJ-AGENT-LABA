@@ -477,9 +477,9 @@ export default function ReportPage() {
                         type="button"
                         onClick={() => void deleteReport(saved)}
                         disabled={deletingReportId !== null}
-                        className="rounded-md border border-red-900/70 px-2 py-1 font-semibold text-red-300 transition hover:border-red-500 hover:bg-red-950/50 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-lg border border-red-600/80 bg-red-950/40 px-3 py-2 font-semibold text-red-200 transition hover:border-red-400 hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {deletingReportId === saved.id ? "Usuwanie…" : "🗑 Usuń"}
+                        {deletingReportId === saved.id ? "Usuwanie…" : "🗑️ Usuń raport"}
                       </button>
                     </div>
                   </div>
@@ -510,14 +510,26 @@ export default function ReportPage() {
                     {selectedReport.topic}
                   </h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedReport(null)}
-                  aria-label="Zamknij raport"
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#31535a] text-lg text-[#cffafe] transition hover:border-[#22d3ee] hover:bg-[#12302f]"
-                >
-                  ×
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void deleteReport(selectedReport)}
+                    disabled={deletingReportId !== null}
+                    className="rounded-lg border border-red-600/80 bg-red-950/40 px-3 py-2 text-sm font-semibold text-red-200 transition hover:border-red-400 hover:bg-red-900/60 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {deletingReportId === selectedReport.id
+                      ? "Usuwanie…"
+                      : "🗑️ Usuń raport"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReport(null)}
+                    aria-label="Zamknij raport"
+                    className="grid h-10 w-10 place-items-center rounded-lg border border-[#31535a] text-lg text-[#cffafe] transition hover:border-[#22d3ee] hover:bg-[#12302f]"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
               <div className="px-5 py-7 sm:px-8 sm:py-10">
                 <ReportMarkdown content={selectedReport.content} />
