@@ -67,6 +67,14 @@ create table if not exists public.briefings (
   user_id uuid references auth.users(id) on delete cascade
 );
 
+create table if not exists public.webhook_events (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  type text not null check (type in ('feedback', 'alert', 'order')),
+  data jsonb not null,
+  analysis text not null check (char_length(trim(analysis)) > 0)
+);
+
 create index if not exists documents_user_id_title_idx on public.documents (user_id, title);
 
 create index if not exists reports_user_id_created_at_idx
@@ -74,6 +82,9 @@ create index if not exists reports_user_id_created_at_idx
 
 create index if not exists briefings_user_id_date_idx
   on public.briefings (user_id, date desc);
+
+create index if not exists webhook_events_created_at_idx
+  on public.webhook_events (created_at desc);
 
 create or replace function public.match_documents(
   query_embedding vector(768),
@@ -150,6 +161,7 @@ alter table public.messages enable row level security;
 alter table public.documents enable row level security;
 alter table public.reports enable row level security;
 alter table public.briefings enable row level security;
+alter table public.webhook_events enable row level security;
 
 drop policy if exists "own profile" on public.user_profiles;
 create policy "own profile" on public.user_profiles for all to authenticated
