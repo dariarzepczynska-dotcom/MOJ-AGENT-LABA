@@ -9,6 +9,7 @@ const links = [
   { href: "/", icon: "HOME", label: "Dashboard" },
   { href: "/chat", icon: "CHAT", label: "Chat z persona" },
   { href: "/history", icon: "HIST", label: "Historia" },
+  { href: "/briefings", icon: "NEWS", label: "📰 Briefingi" },
   { href: "/upload", icon: "BOOK", label: "📚 Baza wiedzy" },
   { href: "/knowledge", icon: "RAG", label: "Podgląd bazy RAG" },
   { href: "/think", icon: "BRAIN", label: "Tryb myslenia" },

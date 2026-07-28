@@ -6,6 +6,7 @@ import {
   getExchangeRateData,
   getWeatherData,
 } from "@/app/lib/react-tools";
+import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,15 @@ const systemPrompt = `Jesteś osobistym asystentem. Napisz poranny briefing w fo
 ## 💡 Porada dnia
 [Krótka, pozytywna porada na dzień]`;
 
-function isAuthorized(request: Request) {
+async function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
-  return !secret || request.headers.get("authorization") === `Bearer ${secret}`;
+  const authorization = request.headers.get("authorization");
+
+  if (!secret || authorization === `Bearer ${secret}`) {
+    return true;
+  }
+
+  return Boolean(await getAuthenticatedSupabase(request));
 }
 
 function getSupabaseAdmin() {
@@ -48,7 +55,7 @@ function getSupabaseAdmin() {
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!(await isAuthorized(request))) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -79,13 +86,10 @@ ${JSON.stringify(usd, null, 2)}`,
     });
 
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("briefings").upsert(
-      {
-        date: currentDateTime.date,
-        content,
-      },
-      { onConflict: "date" },
-    );
+    const { error } = await supabase.from("briefings").insert({
+      date: currentDateTime.date,
+      content,
+    });
 
     if (error) {
       throw new Error(`Nie udało się zapisać briefingu: ${error.message}`);
