@@ -141,33 +141,33 @@ export const calculator = tool({
   },
 });
 
+export function getCurrentDateTimeData() {
+  const now = new Date();
+
+  return {
+    dateTime: new Intl.DateTimeFormat("pl-PL", {
+      dateStyle: "full",
+      timeStyle: "medium",
+      timeZone: "Europe/Warsaw",
+    }).format(now),
+    dayOfWeek: new Intl.DateTimeFormat("pl-PL", {
+      weekday: "long",
+      timeZone: "Europe/Warsaw",
+    }).format(now),
+    timestamp: now.toISOString(),
+    date: new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Warsaw",
+    }).format(now),
+  };
+}
+
 export const currentDateTime = tool({
   description: "Zwraca aktualna date i czas.",
   inputSchema: z.object({}),
-  execute: async () => {
-    const now = new Date();
-
-    return {
-      dateTime: new Intl.DateTimeFormat("pl-PL", {
-        dateStyle: "full",
-        timeStyle: "medium",
-        timeZone: "Europe/Warsaw",
-      }).format(now),
-      dayOfWeek: new Intl.DateTimeFormat("pl-PL", {
-        weekday: "long",
-        timeZone: "Europe/Warsaw",
-      }).format(now),
-      timestamp: now.toISOString(),
-    };
-  },
+  execute: async () => getCurrentDateTimeData(),
 });
 
-export const getWeather = tool({
-  description: "Sprawdza aktualna pogode w podanym miescie.",
-  inputSchema: z.object({
-    city: z.string().min(1).describe("Nazwa miasta, np. Krakow."),
-  }),
-  execute: async ({ city }) => {
+export async function getWeatherData(city: string) {
     const cityName = city.trim();
 
     if (!cityName) {
@@ -254,15 +254,17 @@ export const getWeather = tool({
     } catch (error) {
       return { error: `Blad polaczenia: ${getErrorMessage(error)}` };
     }
-  },
+}
+
+export const getWeather = tool({
+  description: "Sprawdza aktualna pogode w podanym miescie.",
+  inputSchema: z.object({
+    city: z.string().min(1).describe("Nazwa miasta, np. Krakow."),
+  }),
+  execute: async ({ city }) => getWeatherData(city),
 });
 
-export const getExchangeRate = tool({
-  description: "Sprawdza kurs waluty do PLN z NBP.",
-  inputSchema: z.object({
-    currency: z.string().min(3).max(3).describe('Kod waluty, np. "EUR".'),
-  }),
-  execute: async ({ currency }) => {
+export async function getExchangeRateData(currency: string) {
     const code = currency.trim().toUpperCase();
 
     if (!/^[A-Z]{3}$/.test(code)) {
@@ -308,7 +310,14 @@ export const getExchangeRate = tool({
     } catch (error) {
       return { error: `Blad polaczenia: ${getErrorMessage(error)}` };
     }
-  },
+}
+
+export const getExchangeRate = tool({
+  description: "Sprawdza kurs waluty do PLN z NBP.",
+  inputSchema: z.object({
+    currency: z.string().min(3).max(3).describe('Kod waluty, np. "EUR".'),
+  }),
+  execute: async ({ currency }) => getExchangeRateData(currency),
 });
 
 export const getHolidays = tool({

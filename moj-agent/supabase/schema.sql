@@ -59,10 +59,21 @@ create table if not exists public.reports (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.briefings (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  content text not null check (char_length(trim(content)) > 0),
+  date date not null unique,
+  user_id uuid references auth.users(id) on delete cascade
+);
+
 create index if not exists documents_user_id_title_idx on public.documents (user_id, title);
 
 create index if not exists reports_user_id_created_at_idx
   on public.reports (user_id, created_at desc);
+
+create index if not exists briefings_user_id_date_idx
+  on public.briefings (user_id, date desc);
 
 create or replace function public.match_documents(
   query_embedding vector(768),
@@ -138,6 +149,7 @@ alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 alter table public.documents enable row level security;
 alter table public.reports enable row level security;
+alter table public.briefings enable row level security;
 
 drop policy if exists "own profile" on public.user_profiles;
 create policy "own profile" on public.user_profiles for all to authenticated
@@ -155,3 +167,6 @@ using (user_id = auth.uid()) with check (user_id = auth.uid());
 drop policy if exists "own reports" on public.reports;
 create policy "own reports" on public.reports for all to authenticated
 using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "own briefings" on public.briefings;
+create policy "own briefings" on public.briefings for select to authenticated
+using (user_id = auth.uid());
