@@ -312,6 +312,68 @@ export async function getExchangeRateData(currency: string) {
     }
 }
 
+export async function getWorldNewsData() {
+  try {
+    const newsUrl = new URL("https://news.google.com/rss/search");
+    newsUrl.searchParams.set(
+      "q",
+      "najważniejsze wiadomości świat polityka gospodarka bezpieczeństwo when:1d",
+    );
+    newsUrl.searchParams.set("hl", "pl");
+    newsUrl.searchParams.set("gl", "PL");
+    newsUrl.searchParams.set("ceid", "PL:pl");
+
+    const result = await fetchWithTimeout(newsUrl);
+
+    if ("error" in result) return { error: result.error };
+
+    const { response } = result;
+
+    if (!response.ok) {
+      return { error: `Google News zwróciło błąd ${response.status}.` };
+    }
+
+    const xml = await response.text();
+    const articles = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)]
+      .slice(0, 12)
+      .map((match) => {
+        const item = match[1];
+        const readTag = (tag: string) => {
+          const tagMatch = item.match(
+            new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, "i"),
+          );
+
+          return decodeHtmlEntities(
+            (tagMatch?.[1] ?? "")
+              .replace(/^<!\[CDATA\[|\]\]>$/g, "")
+              .replace(/<[^>]+>/g, "")
+              .trim(),
+          );
+        };
+
+        return {
+          title: readTag("title"),
+          source: readTag("source"),
+          publishedAt: readTag("pubDate"),
+          url: readTag("link"),
+        };
+      })
+      .filter((article) => article.title && article.url);
+
+    if (!articles.length) {
+      return { error: "Google News nie zwróciło aktualnych wiadomości." };
+    }
+
+    return {
+      articles,
+      source: "Google News RSS",
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    return { error: `Błąd pobierania wiadomości: ${getErrorMessage(error)}` };
+  }
+}
+
 export const getExchangeRate = tool({
   description: "Sprawdza kurs waluty do PLN z NBP.",
   inputSchema: z.object({

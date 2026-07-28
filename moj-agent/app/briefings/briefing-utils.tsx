@@ -37,17 +37,35 @@ export function getBriefingPreview(content: string | null) {
 }
 
 function renderInline(text: string): ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)]+\))/g);
 
-  return parts.map((part, index) =>
-    part.startsWith("**") && part.endsWith("**") ? (
-      <strong key={index} className="font-semibold text-white">
-        {part.slice(2, -2)}
-      </strong>
-    ) : (
-      <Fragment key={index}>{part}</Fragment>
-    ),
-  );
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={index} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+
+    if (link) {
+      return (
+        <a
+          key={index}
+          href={link[2]}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-[#7af0cb] underline decoration-[#7af0cb]/40 underline-offset-2 hover:text-white"
+        >
+          {link[1]}
+        </a>
+      );
+    }
+
+    return <Fragment key={index}>{part}</Fragment>;
+  });
 }
 
 export function BriefingMarkdown({ content }: { content: string }) {
