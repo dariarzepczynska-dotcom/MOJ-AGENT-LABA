@@ -14,6 +14,7 @@ export default function BriefingsPage() {
   const [briefings, setBriefings] = useState<BriefingRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
   const [error, setError] = useState("");
 
   const loadBriefings = useCallback(async () => {
@@ -80,6 +81,37 @@ export default function BriefingsPage() {
     </button>
   );
 
+  const deleteBriefing = async (briefing: BriefingRow) => {
+    if (!window.confirm("Czy na pewno chcesz usunąć ten briefing?")) return;
+
+    setDeletingId(briefing.id);
+    setError("");
+
+    try {
+      const response = await authFetch(`/api/briefings/${briefing.id}`, {
+        method: "DELETE",
+      });
+      const result = (await response.json()) as { success?: boolean; error?: string };
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Nie udało się usunąć briefingu.");
+      }
+
+      setBriefings((current) =>
+        current.filter((item) => item.id !== briefing.id),
+      );
+    } catch (deleteError) {
+      console.error("Nie udało się usunąć briefingu:", deleteError);
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Nie udało się usunąć briefingu.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#050506] px-4 py-6 text-[#ededed] sm:px-6">
       <div className="mx-auto w-full max-w-5xl">
@@ -118,12 +150,15 @@ export default function BriefingsPage() {
           )}
 
           {briefings.map((briefing) => (
-            <Link
+            <article
               key={briefing.id}
-              href={`/briefings/${briefing.id}`}
-              className="group block rounded-xl border border-[#2f403b] bg-[#091310] p-5 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-[#3dd6a3] hover:bg-[#0d1715]"
+              className="group flex flex-col gap-4 rounded-xl border border-[#2f403b] bg-[#091310] p-5 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-[#3dd6a3] hover:bg-[#0d1715] sm:flex-row sm:items-start"
             >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <Link
+                href={`/briefings/${briefing.id}`}
+                className="min-w-0 flex-1"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold capitalize text-white">
                     {formatBriefingDate(briefing)}
@@ -135,8 +170,19 @@ export default function BriefingsPage() {
                 <span className="shrink-0 rounded-full border border-[#3dd6a350] bg-[#0d211b] px-3 py-1.5 text-xs font-semibold text-[#c7fff0]">
                   ✅ wygenerowany automatycznie
                 </span>
-              </div>
-            </Link>
+                </div>
+              </Link>
+              <button
+                type="button"
+                onClick={() => void deleteBriefing(briefing)}
+                disabled={deletingId === briefing.id}
+                aria-label={`Usuń briefing z dnia ${formatBriefingDate(briefing)}`}
+                title="Usuń briefing"
+                className="grid h-10 w-10 shrink-0 place-items-center self-end rounded-lg border border-red-900/70 bg-red-950/30 text-lg text-red-300 transition hover:border-red-500 hover:bg-red-950/60 disabled:cursor-wait disabled:opacity-50 sm:self-start"
+              >
+                {deletingId === briefing.id ? "…" : "🗑️"}
+              </button>
+            </article>
           ))}
         </section>
       </div>

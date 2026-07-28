@@ -32,3 +32,24 @@ $$;
 
 create index if not exists briefings_created_at_desc_idx
   on public.briefings (created_at desc);
+
+-- Lista briefingów jest pobierana w przeglądarce przez zalogowanego użytkownika.
+grant select on table public.briefings to authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'briefings'
+      and policyname = 'Authenticated users can read briefings'
+  ) then
+    create policy "Authenticated users can read briefings"
+      on public.briefings
+      for select
+      to authenticated
+      using (true);
+  end if;
+end
+$$;

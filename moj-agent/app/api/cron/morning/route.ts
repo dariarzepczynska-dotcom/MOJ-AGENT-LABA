@@ -1,5 +1,4 @@
 import { google } from "@ai-sdk/google";
-import { createClient } from "@supabase/supabase-js";
 import { generateText } from "ai";
 import {
   getCurrentDateTimeData,
@@ -7,6 +6,7 @@ import {
   getWeatherData,
 } from "@/app/lib/react-tools";
 import { getAuthenticatedSupabase } from "@/lib/server-supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -37,21 +37,6 @@ async function isAuthorized(request: Request) {
   }
 
   return Boolean(await getAuthenticatedSupabase(request));
-}
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      "Brak NEXT_PUBLIC_SUPABASE_URL lub SUPABASE_SERVICE_ROLE_KEY.",
-    );
-  }
-
-  return createClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
 }
 
 export async function GET(request: Request) {
