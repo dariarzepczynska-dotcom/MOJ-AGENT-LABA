@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 import { ImageAttachmentPreview } from "../components/ImageAttachmentPreview";
 import { useImageAttachment } from "../lib/image-attachments";
 
@@ -67,6 +68,7 @@ export default function SearchPage() {
     () =>
       new TextStreamChatTransport({
         api: "/api/chat",
+        fetch: authFetch,
         body: {
           mode: "search",
           model: "flash",

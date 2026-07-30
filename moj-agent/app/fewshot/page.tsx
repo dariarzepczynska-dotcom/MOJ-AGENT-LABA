@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 
 const exampleTerms = [
   "Sztuczna inteligencja",
@@ -27,6 +28,7 @@ export default function FewShotPage() {
     () =>
       new TextStreamChatTransport({
         api: "/api/fewshot",
+        fetch: authFetch,
       }),
     [],
   );

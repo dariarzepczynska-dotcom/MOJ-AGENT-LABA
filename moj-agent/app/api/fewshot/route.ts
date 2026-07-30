@@ -1,5 +1,9 @@
 import { google } from "@ai-sdk/google";
 import { convertToModelMessages, isStepCount, streamText } from "ai";
+import { createApiUsageOnFinish, enforceDailyTokenLimit } from "@/lib/api-usage";
+import { getAuthenticatedSupabase } from "@/lib/server-supabase";
+
+const modelId = "gemini-3.1-flash-lite";
 
 const fewShotPrompt = `Jesteś asystentem, który odpowiada w DOKŁADNIE takim formacie jak w przykładach poniżej.
 
@@ -32,15 +36,26 @@ zamiast mieć umowę o pracę. Zarabia więcej netto, ale sam płaci ZUS i nie m
 - Odpowiadaj po polsku`;
 
 export async function POST(req: Request) {
+  const auth = await getAuthenticatedSupabase(req);
+  if (!auth) return new Response("Brak autoryzacji.", { status: 401 });
+  const limitResponse = await enforceDailyTokenLimit(auth.client);
+  if (limitResponse) return limitResponse;
+
   const { messages } = await req.json();
 
   const result = streamText({
-    model: google("gemini-3.1-flash-lite"),
+    model: google(modelId),
     // @ts-expect-error AI SDK v7 replaced maxSteps with stopWhen.
     maxSteps: 3,
     system: fewShotPrompt,
     messages: await convertToModelMessages(messages),
     stopWhen: isStepCount(3),
+    onFinish: createApiUsageOnFinish({
+      client: auth.client,
+      userId: auth.user.id,
+      model: modelId,
+      endpoint: "/api/fewshot",
+    }),
   });
 
   return result.toTextStreamResponse();

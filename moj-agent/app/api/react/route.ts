@@ -17,7 +17,10 @@ import {
   createSearchKnowledge,
   shouldSearchKnowledge,
 } from "../../lib/knowledge-tool";
+import { createApiUsageOnFinish, enforceDailyTokenLimit } from "@/lib/api-usage";
 import { getAuthenticatedSupabase } from "@/lib/server-supabase";
+
+const modelId = "gemini-3.1-flash-lite";
 
 if (process.env.ENABLE_SEARCH_GROUNDING === "true") {
   console.warn(
@@ -124,6 +127,9 @@ function requestsGeneratedImage(text: string) {
 export async function POST(req: Request) {
   const auth = await getAuthenticatedSupabase(req);
   if (!auth) return new Response("Brak autoryzacji.", { status: 401 });
+  const limitResponse = await enforceDailyTokenLimit(auth.client);
+  if (limitResponse) return limitResponse;
+
   const { messages } = await req.json();
   const forceKnowledgeSearch = shouldSearchKnowledge(messages);
   const shouldGenerateImage = requestsGeneratedImage(getLatestUserText(messages));
@@ -131,7 +137,7 @@ export async function POST(req: Request) {
   const searchKnowledge = createSearchKnowledge(auth.client);
 
   const result = streamText({
-    model: google("gemini-3.1-flash-lite"),
+    model: google(modelId),
     system: reactSystemPrompt,
     messages: modelMessages,
     tools: {
@@ -178,6 +184,12 @@ export async function POST(req: Request) {
       return undefined;
     },
     stopWhen: isStepCount(8),
+    onFinish: createApiUsageOnFinish({
+      client: auth.client,
+      userId: auth.user.id,
+      model: modelId,
+      endpoint: "/api/react",
+    }),
   });
 
   return result.toUIMessageStreamResponse();

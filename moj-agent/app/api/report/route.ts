@@ -1,11 +1,14 @@
 import { google } from "@ai-sdk/google";
 import { convertToModelMessages, isStepCount, streamText } from "ai";
+import { createApiUsageOnFinish, enforceDailyTokenLimit } from "@/lib/api-usage";
+import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 import {
   calculator,
   readWebPage,
   searchWikipedia,
 } from "../../lib/react-tools";
 
+const modelId = "gemini-3.1-flash-lite";
 const useSearchGrounding = process.env.ENABLE_SEARCH_GROUNDING === "true";
 
 if (useSearchGrounding) {
@@ -64,11 +67,16 @@ Dzisiejsza data: ${new Intl.DateTimeFormat("pl-PL", {
 }).format(new Date())}.`;
 
 export async function POST(req: Request) {
+  const auth = await getAuthenticatedSupabase(req);
+  if (!auth) return new Response("Brak autoryzacji.", { status: 401 });
+  const limitResponse = await enforceDailyTokenLimit(auth.client);
+  if (limitResponse) return limitResponse;
+
   const { messages } = await req.json();
   const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
-    model: google("gemini-3.1-flash-lite"),
+    model: google(modelId),
     // @ts-expect-error AI SDK v7 replaced maxSteps with stopWhen below.
     maxSteps: 8,
     system: reportSystemPrompt,
@@ -82,6 +90,12 @@ export async function POST(req: Request) {
       calculator,
     },
     stopWhen: isStepCount(8),
+    onFinish: createApiUsageOnFinish({
+      client: auth.client,
+      userId: auth.user.id,
+      model: modelId,
+      endpoint: "/api/report",
+    }),
   });
 
   return result.toUIMessageStreamResponse();

@@ -255,7 +255,9 @@ export default function AgentPage() {
       }),
     [accessToken],
   );
-  const { messages, sendMessage, setMessages, status } = useChat({ transport });
+  const { messages, sendMessage, setMessages, status, error } = useChat({
+    transport,
+  });
   const isLoading = status === "submitted" || status === "streaming";
   const currentStreamingAssistantId = isLoading
     ? [...messages].reverse().find((message) => message.role === "assistant")?.id
@@ -477,6 +479,15 @@ export default function AgentPage() {
               <div className="flex justify-start">
                 <div className="rounded-lg border border-[#263244] bg-[#111827] px-4 py-3 text-sm text-[#cbd5e1]">
                   Agent startuje...
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="flex justify-start">
+                <div className="max-w-[92%] rounded-lg border border-[#7f1d1d] bg-[#2a0d0d] px-4 py-3 text-sm leading-6 text-[#fecaca] sm:max-w-[84%]">
+                  {error.message ||
+                    "Nie udało się pobrać odpowiedzi agenta. Spróbuj ponownie."}
                 </div>
               </div>
             )}

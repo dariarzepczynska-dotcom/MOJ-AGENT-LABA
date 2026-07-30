@@ -1,8 +1,10 @@
 import { google } from "@ai-sdk/google";
 import { generateObject, generateText, isStepCount, tool } from "ai";
 import { z } from "zod";
+import { enforceDailyTokenLimit, logApiUsage } from "@/lib/api-usage";
 import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 
+const modelId = "gemini-3.1-flash-lite";
 const imagePattern = /^data:(image\/(?:png|jpeg|jpg|webp));base64,([\s\S]+)$/;
 
 const calculator = tool({
@@ -81,6 +83,8 @@ function sanitizeWooHtml(value: string) {
 export async function POST(request: Request) {
   const auth = await getAuthenticatedSupabase(request);
   if (!auth) return Response.json({ error: "Brak autoryzacji." }, { status: 401 });
+  const limitResponse = await enforceDailyTokenLimit(auth.client);
+  if (limitResponse) return limitResponse;
 
   try {
     const body = await request.json();
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
     const notes = typeof body.notes === "string" ? body.notes.slice(0, 1500) : "";
 
     const research = await generateText({
-      model: google("gemini-3.1-flash-lite"),
+      model: google(modelId),
       system: `Jesteś researcherem e-commerce marki Fikartki. Sprawdź fikartki.pl narzędziem readWebPage.
 Używaj Google Search do aktualnych kategorii, readWebPage do źródeł, calculator do wymiarów
 i searchWikipedia do nieznanych technik. Nie wymyślaj cech, których nie widać i nie podano.
@@ -108,9 +112,19 @@ Główne kategorie: Kartki, Zaproszenia, Biżuteria, Dekoracje, Produkty cyfrowe
       },
       stopWhen: isStepCount(4),
     });
+    await logApiUsage({
+      client: auth.client,
+      userId: auth.user.id,
+      usage: research.usage,
+      model: modelId,
+      endpoint: "/api/product-description",
+    });
+
+    const finalGenerationLimitResponse = await enforceDailyTokenLimit(auth.client);
+    if (finalGenerationLimitResponse) return finalGenerationLimitResponse;
 
     const result = await generateObject({
-      model: google("gemini-3.1-flash-lite"),
+      model: google(modelId),
       schema: productSchema,
       system: `Jesteś copywriterem SEO Fikartki.pl. Pisz ciepłym językiem polskiej marki handmade.
 Zwróć opis gotowy do WordPress/WooCommerce. W polach HTML używaj tylko h2, h3, p, ul, li, strong.
@@ -124,6 +138,13 @@ Meta description: 140–160 znaków. SEO title: maksymalnie 60 znaków.`,
           { type: "image", image },
         ],
       }],
+    });
+    await logApiUsage({
+      client: auth.client,
+      userId: auth.user.id,
+      usage: result.usage,
+      model: modelId,
+      endpoint: "/api/product-description",
     });
 
     return Response.json({

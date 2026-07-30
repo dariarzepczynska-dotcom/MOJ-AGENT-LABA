@@ -2,8 +2,10 @@ import { google } from "@ai-sdk/google";
 import { createClient } from "@supabase/supabase-js";
 import { generateText } from "ai";
 import { z } from "zod";
+import { logApiUsage } from "@/lib/api-usage";
 
 export const dynamic = "force-dynamic";
+const modelId = "gemini-3.1-flash-lite";
 
 const eventSchema = z.discriminatedUnion("type", [
   z.object({
@@ -101,8 +103,8 @@ export async function POST(request: Request) {
 
   try {
     const event = parsed.data;
-    const { text: analysis } = await generateText({
-      model: google("gemini-3.1-flash-lite"),
+    const result = await generateText({
+      model: google(modelId),
       system: `Jesteś agentem analizującym zdarzenia webhook. Odpowiadaj zwięźle
 i wyłącznie po polsku. Opieraj się tylko na przekazanych danych; nie dopowiadaj faktów.`,
       prompt: `${prompts[event.type]}
@@ -113,6 +115,14 @@ ${JSON.stringify(event.data, null, 2)}`,
     });
 
     const supabase = getSupabaseAdmin();
+    const analysis = result.text;
+    await logApiUsage({
+      client: supabase,
+      userId: null,
+      usage: result.usage,
+      model: modelId,
+      endpoint: "/api/webhook",
+    });
     const { data: savedEvent, error } = await supabase
       .from("webhook_events")
       .insert({

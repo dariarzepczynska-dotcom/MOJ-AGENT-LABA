@@ -1,5 +1,7 @@
 import { google } from "@ai-sdk/google";
 import { convertToModelMessages, isStepCount, streamText } from "ai";
+import { createApiUsageOnFinish, enforceDailyTokenLimit } from "@/lib/api-usage";
+import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 import {
   calculator,
   currentDateTime,
@@ -12,6 +14,8 @@ import {
   saveNote,
   searchWikipedia,
 } from "../../lib/react-tools";
+
+const modelId = "gemini-3.1-flash-lite";
 
 if (process.env.ENABLE_SEARCH_GROUNDING === "true") {
   console.warn(
@@ -85,11 +89,16 @@ Po zebraniu danych, wygeneruj GOTOWY PLAN w formacie:
 - Jesli po 3 nieudanych probach nie masz danych - powiedz wprost czego brakuje.`;
 
 export async function POST(req: Request) {
+  const auth = await getAuthenticatedSupabase(req);
+  if (!auth) return new Response("Brak autoryzacji.", { status: 401 });
+  const limitResponse = await enforceDailyTokenLimit(auth.client);
+  if (limitResponse) return limitResponse;
+
   const { messages } = await req.json();
   const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
-    model: google("gemini-3.1-flash-lite"),
+    model: google(modelId),
     // @ts-expect-error AI SDK v7 replaced maxSteps with stopWhen below.
     maxSteps: 3,
     system: travelSystemPrompt,
@@ -110,6 +119,12 @@ export async function POST(req: Request) {
       getNotes,
     },
     stopWhen: isStepCount(3),
+    onFinish: createApiUsageOnFinish({
+      client: auth.client,
+      userId: auth.user.id,
+      model: modelId,
+      endpoint: "/api/travel",
+    }),
   });
 
   return result.toUIMessageStreamResponse();

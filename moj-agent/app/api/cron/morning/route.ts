@@ -6,10 +6,12 @@ import {
   getWeatherData,
   getWorldNewsData,
 } from "@/app/lib/react-tools";
+import { enforceDailyTokenLimit, logApiUsage } from "@/lib/api-usage";
 import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
+const modelId = "gemini-3.1-flash-lite";
 
 const systemPrompt = `Jesteś osobistym asystentem. Napisz poranny briefing w formacie:
 
@@ -39,18 +41,18 @@ Korzystaj wyłącznie z przekazanych nagłówków. Zachowaj URL i nazwę źród�
 Nie dopowiadaj faktów, których nie ma w danych. Jeśli wiadomości są niedostępne,
 napisz to wprost zamiast tworzyć wiadomości z pamięci.`;
 
-async function isAuthorized(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const authorization = request.headers.get("authorization");
-
-  if (!secret || authorization === `Bearer ${secret}`) return true;
-
-  return Boolean(await getAuthenticatedSupabase(request));
-}
-
 export async function GET(request: Request) {
-  if (!(await isAuthorized(request))) {
+  const secret = process.env.CRON_SECRET;
+  const isCronRequest =
+    !secret || request.headers.get("authorization") === `Bearer ${secret}`;
+  const auth = isCronRequest ? null : await getAuthenticatedSupabase(request);
+
+  if (!isCronRequest && !auth) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (auth) {
+    const limitResponse = await enforceDailyTokenLimit(auth.client);
+    if (limitResponse) return limitResponse;
   }
 
   try {
@@ -62,8 +64,8 @@ export async function GET(request: Request) {
     ]);
     const currentDateTime = getCurrentDateTimeData();
 
-    const { text: content } = await generateText({
-      model: google("gemini-3.1-flash-lite"),
+    const result = await generateText({
+      model: google(modelId),
       system: systemPrompt,
       prompt: `Przygotuj briefing wyłącznie na podstawie poniższych danych. Nie zmieniaj kursów, danych pogodowych ani informacji w nagłówkach. Jeśli nie masz pewnej informacji, napisz to wprost.
 
@@ -83,7 +85,17 @@ Aktualne wiadomości ze świata:
 ${JSON.stringify(worldNews, null, 2)}`,
     });
 
-    const { error } = await getSupabaseAdmin().from("briefings").insert({
+    const admin = getSupabaseAdmin();
+    const content = result.text;
+    await logApiUsage({
+      client: auth?.client ?? admin,
+      userId: auth?.user.id ?? null,
+      usage: result.usage,
+      model: modelId,
+      endpoint: "/api/cron/morning",
+    });
+
+    const { error } = await admin.from("briefings").insert({
       date: currentDateTime.date,
       content,
     });

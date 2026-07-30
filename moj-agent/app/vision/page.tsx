@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 import { ImageAttachmentPreview } from "../components/ImageAttachmentPreview";
 import { useImageAttachment } from "../lib/image-attachments";
 
@@ -94,7 +95,7 @@ export default function VisionPage() {
     setGeneratedPrompt("");
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await authFetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

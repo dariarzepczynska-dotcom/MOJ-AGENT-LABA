@@ -1,5 +1,9 @@
 import { google } from "@ai-sdk/google";
 import { streamText } from "ai";
+import { createApiUsageOnFinish, enforceDailyTokenLimit } from "@/lib/api-usage";
+import { getAuthenticatedSupabase } from "@/lib/server-supabase";
+
+const modelId = "gemini-3.1-flash-lite";
 
 const systemPrompt = `Jesteś profesjonalnym asystentem do zarządzania pocztą.
 
@@ -36,6 +40,11 @@ Po wszystkich mailach:
 - ✅ Rekomendacja: [który mail obsłużyć najpierw i dlaczego]`;
 
 export async function POST(request: Request) {
+  const auth = await getAuthenticatedSupabase(request);
+  if (!auth) return Response.json({ error: "Brak autoryzacji." }, { status: 401 });
+  const limitResponse = await enforceDailyTokenLimit(auth.client);
+  if (limitResponse) return limitResponse;
+
   let body: unknown;
 
   try {
@@ -74,9 +83,15 @@ export async function POST(request: Request) {
     .join("\n\n==========\n\n");
 
   const result = streamText({
-    model: google("gemini-3.1-flash-lite"),
+    model: google(modelId),
     system: systemPrompt,
     prompt: `Przeanalizuj poniższe ${emails.length} wiadomości:\n\n${numberedEmails}`,
+    onFinish: createApiUsageOnFinish({
+      client: auth.client,
+      userId: auth.user.id,
+      model: modelId,
+      endpoint: "/api/email-triage",
+    }),
   });
 
   return result.toTextStreamResponse();

@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 
 function getMessageText(message: { parts: Array<{ type: string; text?: string }> }) {
   return message.parts
@@ -18,6 +19,7 @@ export default function ThinkPage() {
     () =>
       new TextStreamChatTransport({
         api: "/api/think",
+        fetch: authFetch,
       }),
     [],
   );

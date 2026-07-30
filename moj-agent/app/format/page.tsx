@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 
 const commandExamples = [
   "/tabela języki programowania 2026",
@@ -158,6 +159,7 @@ export default function FormatPage() {
     () =>
       new TextStreamChatTransport({
         api: "/api/format",
+        fetch: authFetch,
       }),
     [],
   );

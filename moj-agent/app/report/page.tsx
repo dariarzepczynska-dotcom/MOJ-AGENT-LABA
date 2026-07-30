@@ -11,6 +11,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../components/AuthProvider";
 
@@ -140,7 +141,7 @@ export default function ReportPage() {
   const [reportsError, setReportsError] = useState("");
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/report" }),
+    () => new DefaultChatTransport({ api: "/api/report", fetch: authFetch }),
     [],
   );
   const { messages, sendMessage, status, error } = useChat({ transport });

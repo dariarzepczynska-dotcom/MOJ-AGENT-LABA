@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 
 const scenarios = [
   "Planuje weekend w Berlinie. Budzet: 2000 PLN",
@@ -450,6 +451,7 @@ export default function TravelPage() {
     () =>
       new DefaultChatTransport({
         api: "/api/travel",
+        fetch: authFetch,
       }),
     [],
   );

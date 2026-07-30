@@ -1,7 +1,14 @@
 import { google } from "@ai-sdk/google";
 import { GoogleGenAI, Modality } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
-import { convertToModelMessages, isStepCount, streamText, tool } from "ai";
+import {
+  convertToModelMessages,
+  isStepCount,
+  safeValidateUIMessages,
+  streamText,
+  tool,
+  type UIMessage,
+} from "ai";
 import { z } from "zod";
 import {
   knowledgeBasePrompt,
@@ -9,7 +16,14 @@ import {
   createSearchKnowledge,
   shouldSearchKnowledge,
 } from "../../lib/knowledge-tool";
+import { createApiUsageOnFinish, enforceDailyTokenLimit } from "@/lib/api-usage";
 import { getAuthenticatedSupabase } from "@/lib/server-supabase";
+import {
+  BLOCKED_INPUT_MESSAGE,
+  createOutputFilterTransform,
+  sanitizeUserInput,
+  validateUserInput,
+} from "@/lib/chat-security";
 
 if (process.env.ENABLE_SEARCH_GROUNDING === "true") {
   console.warn(
@@ -264,6 +278,89 @@ function isAbortError(error: unknown) {
     (error instanceof DOMException && error.name === "AbortError") ||
     (error instanceof Error && error.name === "AbortError")
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getMessageText(message: unknown) {
+  if (!isRecord(message) || !Array.isArray(message.parts)) return "";
+
+  return message.parts
+    .filter(
+      (part): part is Record<string, unknown> =>
+        isRecord(part) && part.type === "text" && typeof part.text === "string",
+    )
+    .map((part) => String(part.text))
+    .join("");
+}
+
+function sanitizeUserMessages(messages: UIMessage[]): UIMessage[] {
+  return messages.map((message) => {
+    if (
+      !isRecord(message) ||
+      message.role !== "user" ||
+      !Array.isArray(message.parts)
+    ) {
+      return message;
+    }
+
+    return {
+      ...message,
+      parts: message.parts.map((part) =>
+        isRecord(part) && part.type === "text" && typeof part.text === "string"
+          ? { ...part, text: sanitizeUserInput(part.text) }
+          : part,
+      ),
+    };
+  });
+}
+
+async function logBlockedMessage(
+  client: NonNullable<
+    Awaited<ReturnType<typeof getAuthenticatedSupabase>>
+  >["client"],
+  userId: string,
+  message: string,
+  reason: string,
+) {
+  const { error } = await client.from("message_logs").insert({
+    user_id: userId,
+    message_length: message.length,
+    blocked: true,
+    message: message.slice(0, 2000),
+    block_reason: reason,
+  });
+
+  if (error) {
+    console.error("Nie udało się zapisać zablokowanej wiadomości:", error);
+  }
+}
+
+async function enforceRateLimit(
+  client: NonNullable<
+    Awaited<ReturnType<typeof getAuthenticatedSupabase>>
+  >["client"],
+  messageLength: number,
+) {
+  const { data, error } = await client.rpc("check_message_rate_limit", {
+    p_message_length: messageLength,
+  });
+
+  if (error) {
+    console.error("Nie udało się sprawdzić limitu wiadomości:", error);
+    return { error: true as const };
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+  const allowed = isRecord(result) && result.allowed === true;
+  const retryAfterMinutes =
+    isRecord(result) && typeof result.retry_after_minutes === "number"
+      ? Math.max(1, Math.ceil(result.retry_after_minutes))
+      : 1;
+
+  return { error: false as const, allowed, retryAfterMinutes };
 }
 
 async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
@@ -619,15 +716,75 @@ function createUserProfileTools(userId: unknown, authenticatedClient?: ReturnTyp
 export async function POST(req: Request) {
   const auth = await getAuthenticatedSupabase(req);
   if (!auth) return new Response("Brak autoryzacji.", { status: 401 });
+  const limitResponse = await enforceDailyTokenLimit(auth.client);
+  if (limitResponse) return limitResponse;
+
+  let requestBody: unknown;
+  try {
+    requestBody = await req.json();
+  } catch {
+    return new Response(BLOCKED_INPUT_MESSAGE, { status: 400 });
+  }
+
+  if (!isRecord(requestBody) || !Array.isArray(requestBody.messages)) {
+    return new Response(BLOCKED_INPUT_MESSAGE, { status: 400 });
+  }
+
+  const validatedMessages = await safeValidateUIMessages({
+    messages: requestBody.messages,
+  });
+  if (!validatedMessages.success) {
+    return new Response(BLOCKED_INPUT_MESSAGE, { status: 400 });
+  }
+
   const {
-    messages,
     mode = "casual",
     model = "flash",
     image,
-  } = await req.json();
-  const forceKnowledgeSearch = shouldSearchKnowledge(messages);
+  } = requestBody;
+  const messages = validatedMessages.data;
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find((message) => isRecord(message) && message.role === "user");
+  const inputValidation = validateUserInput(getMessageText(lastUserMessage));
+
+  if (!inputValidation.ok) {
+    await logBlockedMessage(
+      auth.client,
+      auth.user.id,
+      getMessageText(lastUserMessage),
+      inputValidation.reason === "length"
+        ? "Przekroczony limit długości"
+        : "Niedozwolona fraza",
+    );
+    return new Response(BLOCKED_INPUT_MESSAGE, { status: 400 });
+  }
+
+  const rateLimit = await enforceRateLimit(
+    auth.client,
+    inputValidation.value.length,
+  );
+  if (rateLimit.error) {
+    return new Response("Nie udało się sprawdzić limitu wiadomości.", {
+      status: 500,
+    });
+  }
+  if (!rateLimit.allowed) {
+    return new Response(
+      `Osiągnąłeś limit wiadomości (50/h). Spróbuj za ${rateLimit.retryAfterMinutes} minut.`,
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterMinutes * 60),
+        },
+      },
+    );
+  }
+
+  const sanitizedMessages = sanitizeUserMessages(messages);
+  const forceKnowledgeSearch = shouldSearchKnowledge(sanitizedMessages);
   const normalizedImage = normalizeImage(image);
-  const modelMessages = await convertToModelMessages(messages);
+  const modelMessages = await convertToModelMessages(sanitizedMessages);
   const authenticatedUserId = auth.user.id;
   const { data: profile, error: profileError } = await auth.client
     .from("user_profiles")
@@ -645,6 +802,15 @@ export async function POST(req: Request) {
   const normalizedUserPreferences = normalizePreferences(profile?.preferences);
   const userProfileTools = createUserProfileTools(authenticatedUserId, auth.client);
   const searchKnowledge = createSearchKnowledge(auth.client);
+  const systemPrompt = `${getPersonalizedSystemPrompt({
+    mode,
+    displayName,
+    userPreferences: normalizedUserPreferences,
+    isNewConversation:
+      sanitizedMessages.filter(
+        (message) => isRecord(message) && message.role === "user",
+      ).length <= 1,
+  })}${forceKnowledgeSearch ? `\n\n${knowledgeAnswerPrompt}` : ""}`;
 
   if (normalizedImage) {
     const lastUserMessage = [...modelMessages]
@@ -660,16 +826,12 @@ export async function POST(req: Request) {
     }
   }
 
+  const modelId = getModelId(model);
   const result = streamText({
-    model: google(getModelId(model)),
+    model: google(modelId),
     // @ts-expect-error AI SDK v7 replaced maxSteps with stopWhen below.
     maxSteps: 3,
-    system: `${getPersonalizedSystemPrompt({
-      mode,
-      displayName,
-      userPreferences: normalizedUserPreferences,
-      isNewConversation: Array.isArray(messages) && messages.filter((message) => message?.role === "user").length <= 1,
-    })}${forceKnowledgeSearch ? `\n\n${knowledgeAnswerPrompt}` : ""}`,
+    system: systemPrompt,
     messages: modelMessages,
     tools: {
       ...(process.env.ENABLE_SEARCH_GROUNDING === "true"
@@ -690,9 +852,16 @@ export async function POST(req: Request) {
           }
         : undefined,
     stopWhen: isStepCount(3),
+    experimental_transform: createOutputFilterTransform(systemPrompt),
     onError: ({ error }) => {
       console.error("Blad generowania odpowiedzi czatu:", error);
     },
+    onFinish: createApiUsageOnFinish({
+      client: auth.client,
+      userId: auth.user.id,
+      model: modelId,
+      endpoint: "/api/chat",
+    }),
   });
 
   return result.toUIMessageStreamResponse({

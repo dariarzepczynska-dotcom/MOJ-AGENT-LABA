@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
 import { FormEvent, ReactNode, useMemo, useState } from "react";
+import { authFetch } from "@/lib/auth-fetch";
 
 const examples = [
   ["Shopify", "WooCommerce", "PrestaShop"],
@@ -151,7 +152,7 @@ export default function CompetitorPage() {
   const [context, setContext] = useState("");
   const [copied, setCopied] = useState(false);
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/competitor" }),
+    () => new DefaultChatTransport({ api: "/api/competitor", fetch: authFetch }),
     [],
   );
   const { messages, sendMessage, status, error } = useChat({ transport });

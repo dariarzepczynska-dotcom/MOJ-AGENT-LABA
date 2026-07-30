@@ -838,8 +838,8 @@ export default function Home() {
           {error && (
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-2xl border border-[#7f1d1d] bg-[#2a0d0d] px-4 py-3 text-sm leading-6 text-[#fecaca] sm:max-w-[75%] sm:text-base">
-                Nie udalo sie pobrac odpowiedzi agenta. Sprawdz konfiguracje API
-                i sprobuj ponownie.
+                {error.message ||
+                  "Nie udało się pobrać odpowiedzi agenta. Spróbuj ponownie."}
               </div>
             </div>
           )}

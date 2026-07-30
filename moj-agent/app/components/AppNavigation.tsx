@@ -25,6 +25,7 @@ const links = [
   { href: "/competitor", icon: "COMP", label: "🏢 Konkurencja" },
   { href: "/email-triage", icon: "MAIL", label: "📧 E-mail Triage" },
   { href: "/generator-opisu-produktu", icon: "💍", label: "Kreator opisów" },
+  { href: "/admin/security", icon: "SAFE", label: "Bezpieczeństwo" },
 ];
 
 function isActive(pathname: string, href: string) {
