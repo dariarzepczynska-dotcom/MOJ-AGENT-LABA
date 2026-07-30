@@ -594,7 +594,10 @@ export const readWebPage = tool({
       if (!response.ok) {
         return {
           url,
-          error: `API zwrocilo blad ${response.status}. Sprawdz parametry.`,
+          error:
+            response.status === 403
+              ? "Strona zablokowala automatyczny odczyt (HTTP 403). Uzyj innego zrodla."
+              : `Strona zwrocila blad HTTP ${response.status}. Uzyj innego zrodla lub sprawdz adres.`,
         };
       }
 

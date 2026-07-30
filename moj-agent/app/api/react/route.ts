@@ -49,10 +49,27 @@ Podaj pelna, konkretna odpowiedz oparta na zebranych danych. Cytuj zrodla: Open-
 
 Zasady:
 - Nie zgaduj aktualnych danych: uzyj narzedzi.
+- Jezeli zadanie wymaga aktualnego researchu, rozpocznij od Google Search.
+- Google Search sluzy do zebrania i porownania wielu aktualnych zrodel.
+  readWebPage jest opcjonalne i sluzy tylko do poglebienia wybranego zrodla.
+- Nie uzalezniaj wykonania zadania od jednej strony. Gdy readWebPage zwroci
+  HTTP 403, pomin te strone i wykorzystaj wyniki Google Search albo inny URL.
 - Dla obliczen uzywaj calculator.
 - Dla dat wzglednych najpierw uzyj currentDateTime.
 - Gdy narzedzie zwroci blad, sprobuj innego sposobu albo jasno poinformuj.
+- Blad pojedynczego zrodla (np. HTTP 403) nie konczy zadania. Wybierz inne
+  wiarygodne zrodlo i kontynuuj bez ponawiania tego samego adresu.
 - Lacz dane z wielu narzedzi w spojna odpowiedz.
+- Jesli cel zawiera kilka rezultatow (np. research, podsumowanie, grafike i
+  posty), przed zakonczeniem sprawdz liste rezultatow i wykonaj wszystkie.
+  Dla zadania research + grafika + tresci wynik ma zawierac co najmniej:
+  podsumowanie trendow, post na LinkedIn, post na Facebook, wygenerowana
+  grafike oraz sekcje "Zrodla" z adresami URL.
+- Po uzyciu narzedzi zawsze zakoncz odpowiedzia zawierajaca sekcje
+  "### Wynik koncowy". Nie uzywaj tego naglowka, jezeli nie dostarczasz
+  wszystkich wymaganych rezultatow; zamiast tego jasno wskaz brak.
+- Nie wywoluj narzedzia tylko po to, aby wypelnic limit krokow. Gdy masz
+  wystarczajace dane, przejdz do wyniku koncowego.
 - Jezeli zapisujesz dane w notatkach, potwierdz tytul notatki.
 
 ${knowledgeBasePrompt}
@@ -74,8 +91,6 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: google("gemini-3.1-flash-lite"),
-    // @ts-expect-error AI SDK v7 replaced maxSteps with stopWhen below.
-    maxSteps: 3,
     system: reactSystemPrompt,
     messages: modelMessages,
     tools: {
@@ -101,7 +116,7 @@ export async function POST(req: Request) {
             toolChoice: { type: "tool", toolName: "searchKnowledge" },
           }
         : undefined,
-    stopWhen: isStepCount(3),
+    stopWhen: isStepCount(8),
   });
 
   return result.toUIMessageStreamResponse();

@@ -14,6 +14,8 @@ const scenarios = [
   "Ile dni do nastepnego swieta w Polsce? Jaka bedzie wtedy pogoda?",
 ];
 
+const MAX_AGENT_STEPS = 8;
+
 const toolLabels: Record<string, { label: string; icon: string }> = {
   searchKnowledge: { label: "Baza wiedzy", icon: "KB" },
   google_search: { label: "Google Search", icon: "G" },
@@ -174,16 +176,20 @@ function DiagnosticsPanel({
   toolParts,
   elapsedMs,
   isLoading,
-  hasAssistant,
+  assistantText,
 }: {
   toolParts: AnyPart[];
   elapsedMs: number;
   isLoading: boolean;
-  hasAssistant: boolean;
+  assistantText: string;
 }) {
-  const stepCount = Math.min(toolParts.length, 5);
+  const stepCount = Math.min(toolParts.length, MAX_AGENT_STEPS);
   const progressColor =
-    stepCount >= 5 ? "bg-[#ef4444]" : stepCount === 4 ? "bg-[#f59e0b]" : "bg-[#22c55e]";
+    stepCount >= MAX_AGENT_STEPS
+      ? "bg-[#ef4444]"
+      : stepCount >= MAX_AGENT_STEPS - 1
+        ? "bg-[#f59e0b]"
+        : "bg-[#22c55e]";
   const toolCounts = toolParts.reduce<Record<string, number>>((counts, part) => {
     const toolName = getToolName(part);
     counts[toolName] = (counts[toolName] ?? 0) + 1;
@@ -196,14 +202,24 @@ function DiagnosticsPanel({
       input: compact(part.input, 80),
       error: getToolError(part),
     }));
+  const hasFinalResult = /^###\s+Wynik\s+ko(?:n|ń)cowy\b/im.test(assistantText);
   const statusText = isLoading
-    ? stepCount >= 5
+    ? stepCount >= MAX_AGENT_STEPS
       ? "Limit krokow"
       : "W trakcie..."
-    : hasAssistant
-      ? "Ukonczone"
+    : hasFinalResult
+      ? errors.length > 0
+        ? "Ukonczone z ostrzezeniami"
+        : "Ukonczone"
+      : assistantText
+        ? "Nieukonczone"
       : "Oczekuje";
-  const statusIcon = statusText === "Limit krokow" ? "!" : statusText === "Ukonczone" ? "OK" : "...";
+  const statusIcon =
+    statusText === "Ukonczone"
+      ? "OK"
+      : statusText === "Oczekuje" || statusText === "W trakcie..."
+        ? "..."
+        : "!";
   const toolSummary = Object.entries(toolCounts)
     .map(([name, count]) => `${name}(${count})`)
     .join(", ");
@@ -216,12 +232,12 @@ function DiagnosticsPanel({
           <div>
             <div className="flex items-center justify-between">
               <span>Kroki</span>
-              <span>{stepCount}/5</span>
+              <span>{stepCount}/{MAX_AGENT_STEPS}</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded bg-[#1e293b]">
               <div
                 className={`h-full rounded transition-all ${progressColor}`}
-                style={{ width: `${(stepCount / 5) * 100}%` }}
+                style={{ width: `${(stepCount / MAX_AGENT_STEPS) * 100}%` }}
               />
             </div>
           </div>
@@ -345,20 +361,24 @@ function ToolTimeline({ message }: { message: UIMessage }) {
 }
 
 function ProgressBar({ usedTools }: { usedTools: number }) {
-  const currentStep = Math.min(Math.max(usedTools, 0), 5);
+  const currentStep = Math.min(Math.max(usedTools, 0), MAX_AGENT_STEPS);
   const progressColor =
-    currentStep >= 5 ? "bg-[#ef4444]" : currentStep === 4 ? "bg-[#f59e0b]" : "bg-[#22c55e]";
+    currentStep >= MAX_AGENT_STEPS
+      ? "bg-[#ef4444]"
+      : currentStep >= MAX_AGENT_STEPS - 1
+        ? "bg-[#f59e0b]"
+        : "bg-[#22c55e]";
 
   return (
     <div className="border-b border-[#223047] bg-[#0b111a] px-4 py-3">
       <div className="flex items-center justify-between text-xs font-medium text-[#cbd5e1]">
-        <span>Krok {currentStep} z 5</span>
+        <span>Krok {currentStep} z {MAX_AGENT_STEPS}</span>
         <span>{usedTools} wywolan narzedzi</span>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded bg-[#1e293b]">
         <div
           className={`h-full rounded transition-all ${progressColor}`}
-          style={{ width: `${(currentStep / 5) * 100}%` }}
+          style={{ width: `${(currentStep / MAX_AGENT_STEPS) * 100}%` }}
         />
       </div>
     </div>
@@ -559,7 +579,7 @@ export default function ReactAgentPage() {
             toolParts={toolParts}
             elapsedMs={elapsedMs}
             isLoading={isLoading}
-            hasAssistant={!!lastAssistant}
+            assistantText={lastAssistant ? getMessageText(lastAssistant) : ""}
           />
 
           <form
