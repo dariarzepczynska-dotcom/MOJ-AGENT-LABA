@@ -127,6 +127,10 @@ function summarizeToolOutput(toolName: string, output: unknown, errorText?: stri
     return `${record.url}: ${compact(record.text, 160)}`;
   }
 
+  if (toolName === "generateImage" && typeof record.image === "string") {
+    return "Obraz zostal wygenerowany.";
+  }
+
   if (toolName === "searchKnowledge") {
     const count = typeof record.total_found === "number" ? record.total_found : 0;
     return count > 0
@@ -332,6 +336,13 @@ function ToolTimeline({ message }: { message: UIMessage }) {
         const config = toolLabels[toolName] ?? { label: toolName, icon: "API" };
         const running =
           part.state === "input-streaming" || part.state === "input-available";
+        const generatedImage =
+          toolName === "generateImage" &&
+          part.output &&
+          typeof part.output === "object" &&
+          typeof (part.output as { image?: unknown }).image === "string"
+            ? (part.output as { image: string; prompt?: string })
+            : null;
 
         return (
           <div
@@ -353,6 +364,22 @@ function ToolTimeline({ message }: { message: UIMessage }) {
             <p className="mt-2 text-sm leading-5 text-[#cbd5e1]">
               {summarizeToolOutput(toolName, part.output, part.errorText)}
             </p>
+            {generatedImage && (
+              <div className="mt-3">
+                <img
+                  src={generatedImage.image}
+                  alt={generatedImage.prompt ?? "Wygenerowany obraz"}
+                  className="max-h-[420px] w-full rounded-lg border border-[#36506f] object-contain"
+                />
+                <a
+                  href={generatedImage.image}
+                  download="agent-image.png"
+                  className="mt-3 inline-block rounded-lg bg-[#38bdf8] px-3 py-2 text-sm font-semibold text-[#031018] transition hover:bg-[#7dd3fc]"
+                >
+                  Pobierz obraz
+                </a>
+              </div>
+            )}
           </div>
         );
       })}

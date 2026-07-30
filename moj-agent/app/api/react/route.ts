@@ -81,11 +81,52 @@ ${knowledgeBasePrompt}
 - NIGDY nie wywoluj tego samego narzedzia z tymi samymi argumentami dwa razy z rzedu.
 - Jesli po 3 nieudanych probach nie masz danych - powiedz wprost czego brakuje.`;
 
+function getLatestUserText(messages: unknown) {
+  if (!Array.isArray(messages)) {
+    return "";
+  }
+
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find((message) => message?.role === "user");
+
+  if (!lastUserMessage) {
+    return "";
+  }
+
+  if (typeof lastUserMessage.content === "string") {
+    return lastUserMessage.content;
+  }
+
+  if (!Array.isArray(lastUserMessage.parts)) {
+    return "";
+  }
+
+  return lastUserMessage.parts
+    .filter((part: unknown) => {
+      return (
+        !!part &&
+        typeof part === "object" &&
+        (part as { type?: unknown }).type === "text"
+      );
+    })
+    .map((part: unknown) => (part as { text?: unknown }).text)
+    .filter((text: unknown): text is string => typeof text === "string")
+    .join(" ");
+}
+
+function requestsGeneratedImage(text: string) {
+  return /\b(wygeneruj|stworz|zrob|przygotuj)\b[\s\S]{0,80}\b(obraz|obrazek|grafik[aeęi]|ilustracj[aeęi]|logo|wizualizacj[aeęi])\b/i.test(
+    text,
+  );
+}
+
 export async function POST(req: Request) {
   const auth = await getAuthenticatedSupabase(req);
   if (!auth) return new Response("Brak autoryzacji.", { status: 401 });
   const { messages } = await req.json();
   const forceKnowledgeSearch = shouldSearchKnowledge(messages);
+  const shouldGenerateImage = requestsGeneratedImage(getLatestUserText(messages));
   const modelMessages = await convertToModelMessages(messages);
   const searchKnowledge = createSearchKnowledge(auth.client);
 
@@ -109,13 +150,33 @@ export async function POST(req: Request) {
       getNotes,
       searchKnowledge,
     },
-    prepareStep: ({ stepNumber }) =>
-      forceKnowledgeSearch && stepNumber === 0
-        ? {
-            activeTools: ["searchKnowledge"],
-            toolChoice: { type: "tool", toolName: "searchKnowledge" },
-          }
-        : undefined,
+    prepareStep: ({ stepNumber, steps }) => {
+      if (forceKnowledgeSearch && stepNumber === 0) {
+        return {
+          activeTools: ["searchKnowledge"],
+          toolChoice: { type: "tool", toolName: "searchKnowledge" },
+        };
+      }
+
+      const imageWasRequested = shouldGenerateImage;
+      const imageWasCalled = steps.some((step) =>
+        step.toolCalls.some((call) => call?.toolName === "generateImage"),
+      );
+      const earliestImageStep = forceKnowledgeSearch ? 1 : 0;
+
+      if (
+        imageWasRequested &&
+        !imageWasCalled &&
+        stepNumber >= earliestImageStep
+      ) {
+        return {
+          activeTools: ["generateImage"],
+          toolChoice: { type: "tool", toolName: "generateImage" },
+        };
+      }
+
+      return undefined;
+    },
     stopWhen: isStepCount(8),
   });
 
