@@ -1,6 +1,5 @@
 import type { User } from "@supabase/supabase-js";
 import { DAILY_TOKEN_LIMIT } from "@/lib/api-usage";
-import { getAuthenticatedSupabase } from "@/lib/server-supabase";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type UsageRow = {
@@ -34,11 +33,28 @@ function asNumber(value: number | string | null | undefined) {
 }
 
 export async function GET(request: Request) {
-  const auth = await getAuthenticatedSupabase(request);
-  if (!auth) {
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.startsWith("Bearer ")
+    ? authorization.slice(7).trim()
+    : "";
+
+  if (!token) {
     return Response.json({ error: "Brak autoryzacji." }, { status: 401 });
   }
-  if (!isAdmin(auth.user)) {
+
+  const admin = getSupabaseAdmin();
+  const { data: authData, error: authError } =
+    await admin.auth.getUser(token);
+
+  if (authError || !authData.user) {
+    console.error("Nie udało się zweryfikować sesji administratora:", authError);
+    return Response.json(
+      { error: "Sesja jest nieprawidłowa lub wygasła. Zaloguj się ponownie." },
+      { status: 401 },
+    );
+  }
+
+  if (!isAdmin(authData.user)) {
     return Response.json(
       {
         error:
@@ -49,7 +65,6 @@ export async function GET(request: Request) {
   }
 
   try {
-    const admin = getSupabaseAdmin();
     const [
       { data: blockedRows, error: blockedError },
       { count: blockedCount, error: blockedCountError },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { authFetch } from "@/lib/auth-fetch";
+import { useAuth } from "@/app/components/AuthProvider";
 
 type SecurityData = {
   blockedMessages: Array<{
@@ -55,9 +55,12 @@ function EmptyState({ children }: { children: React.ReactNode }) {
   );
 }
 
-async function fetchSecurityData() {
-  const response = await authFetch("/api/admin/security", {
+async function fetchSecurityData(accessToken: string) {
+  const response = await fetch("/api/admin/security", {
     cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
   const payload = (await response.json()) as SecurityData & {
     error?: string;
@@ -69,6 +72,7 @@ async function fetchSecurityData() {
 }
 
 export default function SecurityPage() {
+  const { accessToken } = useAuth();
   const [data, setData] = useState<SecurityData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,7 +81,10 @@ export default function SecurityPage() {
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchSecurityData());
+      if (!accessToken) {
+        throw new Error("Sesja wygasła. Zaloguj się ponownie.");
+      }
+      setData(await fetchSecurityData(accessToken));
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -87,14 +94,19 @@ export default function SecurityPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
+    if (!accessToken) return;
+
     let active = true;
 
-    void fetchSecurityData()
+    void fetchSecurityData(accessToken)
       .then((payload) => {
-        if (active) setData(payload);
+        if (active) {
+          setData(payload);
+          setError(null);
+        }
       })
       .catch((loadError: unknown) => {
         if (!active) return;
@@ -111,7 +123,7 @@ export default function SecurityPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [accessToken]);
 
   const stats = [
     {
