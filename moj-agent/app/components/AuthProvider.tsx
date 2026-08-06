@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { getValidAccessToken } from "@/lib/auth-fetch";
 
 type AuthContextValue = { user: User | null; accessToken: string | null; loading: boolean };
 const AuthContext = createContext<AuthContextValue>({ user: null, accessToken: null, loading: true });
@@ -18,13 +19,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthContextValue>({ user: null, accessToken: null, loading: true });
 
   useEffect(() => {
-    void Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]).then(([userResult, sessionResult]) => {
-      setState({ user: userResult.data.user ?? null, accessToken: sessionResult.data.session?.access_token ?? null, loading: false });
+    let isMounted = true;
+
+    void getValidAccessToken().then(async (accessToken) => {
+      if (!accessToken) {
+        if (isMounted) setState({ user: null, accessToken: null, loading: false });
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getUser(accessToken);
+      if (!isMounted) return;
+
+      setState({
+        user: error ? null : data.user ?? null,
+        accessToken: error ? null : accessToken,
+        loading: false,
+      });
     });
+
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setState({ user: session?.user ?? null, accessToken: session?.access_token ?? null, loading: false });
     });
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

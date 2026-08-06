@@ -1,10 +1,12 @@
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject, generateText, isStepCount, tool } from "ai";
 import { z } from "zod";
 import { enforceDailyTokenLimit, logApiUsage } from "@/lib/api-usage";
 import { getAuthenticatedSupabase } from "@/lib/server-supabase";
+import { fetchWithSystemCa } from "@/lib/system-ca-fetch";
 
 const modelId = "gemini-3.1-flash-lite";
+const google = createGoogleGenerativeAI({ fetch: fetchWithSystemCa });
 const imagePattern = /^data:(image\/(?:png|jpeg|jpg|webp));base64,([\s\S]+)$/;
 
 const calculator = tool({
@@ -70,6 +72,16 @@ const productSchema = z.object({
   seoTitle: z.string(),
   metaDescription: z.string(),
   focusKeyphrase: z.string(),
+  facebookPosts: z.object({
+    short: z.string(),
+    medium: z.string(),
+    long: z.string(),
+    hashtags: z.array(z.string()).min(10).max(20),
+    graphicCta: z.string(),
+    engagementQuestion: z.string(),
+    sharePrompt: z.string(),
+    pinnedComment: z.string(),
+  }),
   uncertainties: z.array(z.string()),
 });
 
@@ -81,10 +93,13 @@ function sanitizeWooHtml(value: string) {
 }
 
 export async function POST(request: Request) {
-  const auth = await getAuthenticatedSupabase(request);
-  if (!auth) return Response.json({ error: "Brak autoryzacji." }, { status: 401 });
-  const limitResponse = await enforceDailyTokenLimit(auth.client);
-  if (limitResponse) return limitResponse;
+  const auth = request.headers.has("authorization")
+    ? await getAuthenticatedSupabase(request)
+    : null;
+  if (auth) {
+    const limitResponse = await enforceDailyTokenLimit(auth.client);
+    if (limitResponse) return limitResponse;
+  }
 
   try {
     const body = await request.json();
@@ -112,16 +127,20 @@ Główne kategorie: Kartki, Zaproszenia, Biżuteria, Dekoracje, Produkty cyfrowe
       },
       stopWhen: isStepCount(4),
     });
-    await logApiUsage({
-      client: auth.client,
-      userId: auth.user.id,
-      usage: research.usage,
-      model: modelId,
-      endpoint: "/api/product-description",
-    });
+    if (auth) {
+      await logApiUsage({
+        client: auth.client,
+        userId: auth.user.id,
+        usage: research.usage,
+        model: modelId,
+        endpoint: "/api/product-description",
+      });
+    }
 
-    const finalGenerationLimitResponse = await enforceDailyTokenLimit(auth.client);
-    if (finalGenerationLimitResponse) return finalGenerationLimitResponse;
+    if (auth) {
+      const finalGenerationLimitResponse = await enforceDailyTokenLimit(auth.client);
+      if (finalGenerationLimitResponse) return finalGenerationLimitResponse;
+    }
 
     const result = await generateObject({
       model: google(modelId),
@@ -130,7 +149,28 @@ Główne kategorie: Kartki, Zaproszenia, Biżuteria, Dekoracje, Produkty cyfrowe
 Zwróć opis gotowy do WordPress/WooCommerce. W polach HTML używaj tylko h2, h3, p, ul, li, strong.
 Pełny opis ma zawierać korzyści, materiały, wymiary, wykonanie, personalizację, czas realizacji i GPSR.
 Nie przedstawiaj przypuszczeń jako faktów. Nieznane dane oznacz "do uzupełnienia" i dodaj do uncertainties.
-Meta description: 140–160 znaków. SEO title: maksymalnie 60 znaków.`,
+Meta description: 140–160 znaków. SEO title: maksymalnie 60 znaków.
+
+Sekcja facebookPosts ma brzmieć jak praca doświadczonego Social Media Managera marki premium handmade.
+Każdy wariant rozpocznij innym, autorskim hookiem zatrzymującym scrollowanie. Następnie opowiedz krótką historię:
+dla kogo i na jaką okazję jest produkt, jakie budzi emocje i dlaczego może pozostać ważną pamiątką.
+Naturalnie wpleć nazwę, widoczne lub podane cechy, materiały, ręczne wykonanie, wysoką jakość i personalizację,
+jeżeli naprawdę dotyczy produktu. Korzyści opisuj z perspektywy klienta, płynną opowieścią bez list punktowanych.
+Każdy wariant zakończ innym, konkretnym CTA zachęcającym do zakupu lub kontaktu.
+
+Wariant short: około 400 znaków. Medium: około 900 znaków. Long: 1200–1800 znaków.
+Teksty mają różnić się konstrukcją, historią, rytmem i hookiem, a nie tylko pojedynczymi słowami.
+Ton: ciepły, elegancki, premium, naturalny i inspirujący. Unikaj stylu katalogowego, nachalnej reklamy oraz słów
+„idealny”, „piękny”, „wyjątkowy”, „zapraszam” i „polecam”. Użyj maksymalnie 8–12 emoji w każdym wariancie,
+z umiarem i nie w każdym zdaniu. Nie dodawaj hashtagów bezpośrednio do wariantów postów — zwróć je osobno.
+
+Hashtags: 10–20 różnorodnych hashtagów z grup branżowych, okazjonalnych, lokalnych, handmade i prezentowych.
+Każdy ma zaczynać się znakiem #. Lokalny hashtag dodaj tylko wtedy, gdy lokalizacja wynika z danych lub researchu.
+GraphicCta: bardzo krótkie CTA do umieszczenia na grafice, opcjonalnie z jednym emoji.
+EngagementQuestion: jedno naturalne pytanie zachęcające do komentarzy.
+SharePrompt: jedno zdanie zachęcające do udostępnienia posta.
+PinnedComment: krótki komentarz przypięty pod postem, który inicjuje rozmowę i wspiera zasięg.
+Nie używaj HTML, nie wymyślaj cech produktu ani danych kontaktowych.`,
       messages: [{
         role: "user",
         content: [
@@ -139,16 +179,19 @@ Meta description: 140–160 znaków. SEO title: maksymalnie 60 znaków.`,
         ],
       }],
     });
-    await logApiUsage({
-      client: auth.client,
-      userId: auth.user.id,
-      usage: result.usage,
-      model: modelId,
-      endpoint: "/api/product-description",
-    });
+    if (auth) {
+      await logApiUsage({
+        client: auth.client,
+        userId: auth.user.id,
+        usage: result.usage,
+        model: modelId,
+        endpoint: "/api/product-description",
+      });
+    }
 
     return Response.json({
       ...result.object,
+      facebookPost: result.object.facebookPosts.medium,
       shortDescription: sanitizeWooHtml(result.object.shortDescription),
       fullDescription: sanitizeWooHtml(result.object.fullDescription),
       safetyInfo: sanitizeWooHtml(result.object.safetyInfo),
