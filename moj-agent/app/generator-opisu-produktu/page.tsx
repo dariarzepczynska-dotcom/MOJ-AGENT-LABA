@@ -56,7 +56,7 @@ function Copy({ value, label = "Kopiuj HTML" }: { value: string; label?: string 
   const [done, setDone] = useState(false);
   return <button type="button" onClick={async () => {
     await navigator.clipboard.writeText(value); setDone(true); setTimeout(() => setDone(false), 1500);
-  }} className="rounded-full border border-[#cdbba9] bg-white px-4 py-2 text-xs font-semibold hover:border-[#846a54]">
+  }} className="rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2 text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--border-strong)]">
     {done ? "Skopiowano ✓" : label}
   </button>;
 }
@@ -87,63 +87,63 @@ export default function ProductDescriptionPage() {
     } finally { setLoading(false); }
   }
 
-  return <main onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} className="min-h-screen bg-[#f8f4ee] text-[#342c27]">
-    {isDraggingImage && <div className="fixed inset-0 z-50 grid place-items-center bg-[#342c27]/80 text-2xl text-white backdrop-blur-sm">Upuść zdjęcie produktu</div>}
-    <header className="border-b border-[#ded2c5] bg-[#f3ece3] px-5 py-14 sm:px-8">
+  return <main onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
+    {isDraggingImage && <div className="fixed inset-0 z-50 grid place-items-center bg-[var(--overlay)] text-2xl text-[var(--overlay-text)] backdrop-blur-sm">Upuść zdjęcie produktu</div>}
+    <header className="border-b border-[var(--border)] bg-[var(--surface)] px-5 py-14 sm:px-8">
       <div className="mx-auto max-w-6xl">
-        <p className="mb-4 text-xs font-bold uppercase tracking-[.28em] text-[#9b765d]">Fikartki · studio opisów</p>
+        <p className="mb-4 text-xs font-bold uppercase tracking-[.28em] text-[var(--accent)]">Fikartki · studio opisów</p>
         <div className="grid items-end gap-8 lg:grid-cols-[1fr_.7fr]">
           <div><h1 className="max-w-3xl font-serif text-4xl leading-[1.08] sm:text-6xl">Zamień zdjęcie w opis, który sprzedaje.</h1>
-          <p className="mt-5 max-w-2xl leading-7 text-[#71645b]">Dwa opisy SEO, kategorie, tagi i bezpieczeństwo — gotowe do WooCommerce.</p></div>
-          <div className="flex flex-wrap gap-2 lg:justify-end">{["Vision", "Google Search", "readWebPage", "calculator", "Wikipedia"].map(x => <span key={x} className="rounded-full border border-[#d6c7b8] bg-white/70 px-3 py-1.5 text-xs text-[#725f51]">{x}</span>)}</div>
+          <p className="mt-5 max-w-2xl leading-7 text-[var(--text-secondary)]">Dwa opisy SEO, kategorie, tagi i bezpieczeństwo — gotowe do WooCommerce.</p></div>
+          <div className="flex flex-wrap gap-2 lg:justify-end">{["Vision", "Google Search", "readWebPage", "calculator", "Wikipedia"].map(x => <span key={x} className="rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs text-[var(--text-secondary)]">{x}</span>)}</div>
         </div>
       </div>
     </header>
 
     <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[.78fr_1.22fr]">
       <section className="space-y-5">
-        <div className="rounded-[28px] border border-[#ded2c5] bg-white p-5 shadow-[0_18px_50px_rgba(71,51,37,.07)]">
-          <p className="text-xs font-bold uppercase tracking-[.2em] text-[#a17a60]">Krok 1</p>
+        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)] p-5 shadow-[var(--shadow-card)]">
+          <p className="text-xs font-bold uppercase tracking-[.2em] text-[var(--accent)]">Krok 1</p>
           <h2 className="mt-1 font-serif text-2xl">Wstaw zdjęcie produktu</h2>
           <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFileInputChange} className="hidden" />
-          {attachedImage ? <div className="relative mt-4 overflow-hidden rounded-2xl bg-[#eee7de]">
+          {attachedImage ? <div className="relative mt-4 overflow-hidden rounded-2xl bg-[var(--card-muted)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={attachedImage.dataUrl} alt="Wybrany produkt" className="aspect-[4/3] w-full object-contain" />
-            <button type="button" onClick={clearImage} className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold shadow">Zmień</button>
-          </div> : <button type="button" onClick={openFilePicker} className="mt-4 grid aspect-[4/3] w-full place-items-center rounded-2xl border border-dashed border-[#bea890] bg-[#faf7f2] p-7 text-center hover:bg-[#f7efe6]">
-            <span><span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#e8ddd1] text-2xl">↥</span><strong className="mt-4 block font-serif text-xl">Wstaw zdjęcie produktu</strong><span className="mt-2 block text-sm text-[#89796e]">PNG, JPG lub WEBP · maks. 4 MB</span></span>
+            <button type="button" onClick={clearImage} className="absolute right-3 top-3 rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] shadow">Zmień</button>
+          </div> : <button type="button" onClick={openFilePicker} className="mt-4 grid aspect-[4/3] w-full place-items-center rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-7 text-center hover:bg-[var(--surface-hover)]">
+            <span><span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[var(--accent-soft)] text-2xl">↥</span><strong className="mt-4 block font-serif text-xl">Wstaw zdjęcie produktu</strong><span className="mt-2 block text-sm text-[var(--muted)]">PNG, JPG lub WEBP · maks. 4 MB</span></span>
           </button>}
-          {imageError && <p className="mt-3 text-sm text-[#a34747]">{imageError}</p>}
-          <label className="mt-5 block text-sm font-semibold" htmlFor="notes">Co warto wiedzieć? <span className="font-normal text-[#9a8c82]">(opcjonalnie)</span></label>
-          <textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder="Np. 14 × 14 cm, papier 250 g, realizacja 5 dni…" className="mt-2 w-full resize-none rounded-2xl border border-[#ded2c5] bg-[#fdfbf8] px-4 py-3 text-sm outline-none focus:border-[#95745c]" />
-          <button type="button" onClick={generate} disabled={!attachedImage || loading} className="mt-4 w-full rounded-full bg-[#4a3a30] px-5 py-3.5 text-sm font-bold text-white hover:bg-[#2f241e] disabled:opacity-40">
+          {imageError && <p className="mt-3 text-sm text-[var(--danger)]">{imageError}</p>}
+          <label className="mt-5 block text-sm font-semibold" htmlFor="notes">Co warto wiedzieć? <span className="font-normal text-[var(--muted)]">(opcjonalnie)</span></label>
+          <textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder="Np. 14 × 14 cm, papier 250 g, realizacja 5 dni…" className="mt-2 w-full resize-none rounded-2xl border border-[var(--border)] bg-[var(--input)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--input-placeholder)] focus:border-[var(--focus-ring)]" />
+          <button type="button" onClick={generate} disabled={!attachedImage || loading} className="mt-4 w-full rounded-full bg-[var(--accent)] px-5 py-3.5 text-sm font-bold text-[var(--accent-contrast)] hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50">
             {loading ? "Tworzę opis i sprawdzam sklep…" : "Wygeneruj opis produktu →"}
           </button>
-          {error && <p className="mt-3 rounded-xl bg-[#fff0ed] px-4 py-3 text-sm text-[#9d3f38]">{error}</p>}
+          {error && <p className="mt-3 rounded-xl border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">{error}</p>}
         </div>
-        <div><p className="mb-3 text-xs font-bold uppercase tracking-[.2em] text-[#a17a60]">Wypróbuj przykład</p>
-          <div className="grid gap-2">{examples.map(ex => <button key={ex.title} type="button" onClick={() => setResult(ex.data)} className="flex items-center gap-3 rounded-2xl border border-[#ded2c5] bg-white p-3 text-left hover:border-[#b79f89]">
-            <span className="h-12 w-12 rounded-xl" style={{ background: `linear-gradient(135deg, ${ex.color}, #eadfd4)` }} /><span className="flex-1"><strong className="block font-serif">{ex.title}</strong><span className="text-xs text-[#8f8075]">{ex.subtitle}</span></span><span>→</span>
+        <div><p className="mb-3 text-xs font-bold uppercase tracking-[.2em] text-[var(--accent)]">Wypróbuj przykład</p>
+          <div className="grid gap-2">{examples.map(ex => <button key={ex.title} type="button" onClick={() => setResult(ex.data)} className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3 text-left hover:border-[var(--border-strong)]">
+            <span className="h-12 w-12 rounded-xl" style={{ background: `linear-gradient(135deg, ${ex.color}, var(--card-muted))` }} /><span className="flex-1"><strong className="block font-serif">{ex.title}</strong><span className="text-xs text-[var(--muted)]">{ex.subtitle}</span></span><span>→</span>
           </button>)}</div>
         </div>
       </section>
 
       <section className="min-w-0">
-        {!result && !loading && <div className="grid min-h-[560px] place-items-center rounded-[28px] border border-[#ded2c5] bg-[#f1e9df]/60 p-8 text-center"><div><span className="text-5xl">❧</span><h2 className="mt-4 font-serif text-3xl">Tu pojawi się gotowy opis</h2><p className="mt-3 text-sm text-[#88786d]">Dodaj zdjęcie lub wybierz jeden z przykładów.</p></div></div>}
-        {loading && <div className="min-h-[560px] rounded-[28px] border border-[#ded2c5] bg-white p-7"><div className="h-7 w-2/3 animate-pulse rounded bg-[#e8ded4]" />{[1,2,3,4].map(n => <div key={n} className="mt-8 h-16 animate-pulse rounded bg-[#f1ebe5]" />)}</div>}
+        {!result && !loading && <div className="grid min-h-[560px] place-items-center rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)] p-8 text-center"><div><span className="text-5xl">❧</span><h2 className="mt-4 font-serif text-3xl">Tu pojawi się gotowy opis</h2><p className="mt-3 text-sm text-[var(--muted)]">Dodaj zdjęcie lub wybierz jeden z przykładów.</p></div></div>}
+        {loading && <div className="min-h-[560px] rounded-[28px] border border-[var(--border)] bg-[var(--card)] p-7"><div className="h-7 w-2/3 animate-pulse rounded bg-[var(--card-muted)]" />{[1,2,3,4].map(n => <div key={n} className="mt-8 h-16 animate-pulse rounded bg-[var(--card-muted)]" />)}</div>}
         {result && !loading && <div className="space-y-5">
-          <article className="rounded-[28px] border border-[#ded2c5] bg-white p-6 shadow-[0_18px_50px_rgba(71,51,37,.07)] sm:p-8">
-            <div className="flex flex-wrap justify-between gap-4 border-b border-[#eadfd5] pb-5"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#a17a60]">Gotowe do WooCommerce</p><h2 className="mt-2 font-serif text-3xl">{result.productName}</h2></div><Copy value={`${result.shortDescription}\n${result.fullDescription}\n${result.safetyInfo}`} label="Kopiuj całość" /></div>
-            <div className="mt-6"><div className="mb-3 flex justify-between gap-3"><h3 className="font-serif text-xl">Krótki opis</h3><Copy value={result.shortDescription} /></div><div className="woocommerce-preview text-sm leading-7 text-[#584b43]" dangerouslySetInnerHTML={{__html: result.shortDescription}} /></div>
-            <div className="mt-7 border-t border-[#eadfd5] pt-6"><div className="mb-3 flex justify-between gap-3"><h3 className="font-serif text-xl">Pełny opis</h3><Copy value={result.fullDescription} /></div><div className="woocommerce-preview text-sm leading-7 text-[#584b43]" dangerouslySetInnerHTML={{__html: result.fullDescription}} /></div>
+          <article className="rounded-[28px] border border-[var(--border)] bg-[var(--card)] p-6 shadow-[var(--shadow-card)] sm:p-8">
+            <div className="flex flex-wrap justify-between gap-4 border-b border-[var(--border)] pb-5"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-[var(--accent)]">Gotowe do WooCommerce</p><h2 className="mt-2 font-serif text-3xl">{result.productName}</h2></div><Copy value={`${result.shortDescription}\n${result.fullDescription}\n${result.safetyInfo}`} label="Kopiuj całość" /></div>
+            <div className="mt-6"><div className="mb-3 flex justify-between gap-3"><h3 className="font-serif text-xl">Krótki opis</h3><Copy value={result.shortDescription} /></div><div className="woocommerce-preview text-sm leading-7 text-[var(--text-secondary)]" dangerouslySetInnerHTML={{__html: result.shortDescription}} /></div>
+            <div className="mt-7 border-t border-[var(--border)] pt-6"><div className="mb-3 flex justify-between gap-3"><h3 className="font-serif text-xl">Pełny opis</h3><Copy value={result.fullDescription} /></div><div className="woocommerce-preview text-sm leading-7 text-[var(--text-secondary)]" dangerouslySetInnerHTML={{__html: result.fullDescription}} /></div>
           </article>
           <div className="grid gap-4 sm:grid-cols-2">
             <Card title="Dane produktu"><p><b>Materiały:</b> {result.materials.join(", ")}</p><p><b>Wielkość:</b> {result.dimensions}</p><p><b>Wykonanie:</b> {result.productionMethod}</p><p><b>Realizacja:</b> {result.leadTime}</p></Card>
             <Card title="Organizacja sklepu"><Chips label="Kategorie" items={result.categories} /><Chips label="Tagi" items={result.tags.map(x => `#${x}`)} /></Card>
           </div>
-          <div className="rounded-3xl border border-[#d9c4a7] bg-[#fffaf1] p-5"><div className="flex justify-between gap-3"><h3 className="font-serif text-xl">Bezpieczeństwo · GPSR</h3><Copy value={result.safetyInfo} /></div><div className="woocommerce-preview mt-3 text-sm leading-7" dangerouslySetInnerHTML={{__html: result.safetyInfo}} /></div>
+          <div className="rounded-3xl border border-[var(--warning)] bg-[var(--warning-soft)] p-5"><div className="flex justify-between gap-3"><h3 className="font-serif text-xl">Bezpieczeństwo · GPSR</h3><Copy value={result.safetyInfo} /></div><div className="woocommerce-preview mt-3 text-sm leading-7" dangerouslySetInnerHTML={{__html: result.safetyInfo}} /></div>
           <Card title="SEO"><p><b>Tytuł:</b> {result.seoTitle}</p><p><b>Fraza:</b> {result.focusKeyphrase}</p><p><b>Meta opis:</b> {result.metaDescription}</p></Card>
-          {result.uncertainties.length > 0 && <p className="rounded-2xl border border-[#dfc9a6] bg-[#fff8e9] px-4 py-3 text-xs"><b>Sprawdź przed publikacją:</b> {result.uncertainties.join(" · ")}</p>}
+          {result.uncertainties.length > 0 && <p className="rounded-2xl border border-[var(--warning)] bg-[var(--warning-soft)] px-4 py-3 text-xs"><b>Sprawdź przed publikacją:</b> {result.uncertainties.join(" · ")}</p>}
         </div>}
       </section>
     </div>
@@ -151,9 +151,9 @@ export default function ProductDescriptionPage() {
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div className="space-y-2 rounded-3xl border border-[#ded2c5] bg-white p-5 text-sm leading-6"><h3 className="mb-3 font-serif text-xl">{title}</h3>{children}</div>;
+  return <div className="space-y-2 rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5 text-sm leading-6"><h3 className="mb-3 font-serif text-xl">{title}</h3>{children}</div>;
 }
 
 function Chips({ label, items }: { label: string; items: string[] }) {
-  return <div className="mt-3"><p className="text-xs text-[#9a877a]">{label}</p><div className="mt-2 flex flex-wrap gap-2">{items.map(x => <span key={x} className="rounded-full bg-[#eee5dc] px-3 py-1 text-xs">{x}</span>)}</div></div>;
+  return <div className="mt-3"><p className="text-xs text-[var(--muted)]">{label}</p><div className="mt-2 flex flex-wrap gap-2">{items.map(x => <span key={x} className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs">{x}</span>)}</div></div>;
 }

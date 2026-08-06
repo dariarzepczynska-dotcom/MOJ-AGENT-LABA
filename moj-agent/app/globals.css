@@ -1,47 +1,251 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root,
+html[data-theme="dark"] {
+  --background: #050506;
+  --surface: #091310;
+  --surface-hover: #0d1715;
+  --surface-elevated: #111827;
+  --card: #101722;
+  --card-muted: #0b111a;
+  --border: #4a6059;
+  --border-strong: #61736c;
+  --text-primary: #ededed;
+  --text-secondary: #b6c4be;
+  --muted: #9fb0aa;
+  --accent: #3dd6a3;
+  --accent-hover: #75e5bd;
+  --accent-soft: #12342b;
+  --accent-contrast: #04110d;
+  --accent-shadow: rgb(61 214 163 / 12%);
+  --success: #86efac;
+  --success-soft: #0d2d20;
+  --warning: #fcd34d;
+  --warning-soft: #2a1906;
+  --danger: #fecaca;
+  --danger-soft: rgb(127 29 29 / 32%);
+  --danger-soft-hover: rgb(127 29 29 / 48%);
+  --danger-border: #7f1d1d;
+  --sidebar: rgb(5 8 7 / 97%);
+  --sidebar-card: #08100e;
+  --header: rgb(5 8 7 / 96%);
+  --input: #050a09;
+  --input-placeholder: #83948d;
+  --focus-ring: #75e5bd;
+  --overlay: rgb(0 0 0 / 72%);
+  --overlay-text: #ffffff;
+  --shadow: rgb(0 0 0 / 30%);
+  --shadow-card: 0 18px 50px rgb(0 0 0 / 20%);
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --background: #f8f4ee;
+  --surface: #f3ece3;
+  --surface-hover: #ebe1d6;
+  --surface-elevated: #ffffff;
+  --card: #ffffff;
+  --card-muted: #f1e9df;
+  --border: #9a877a;
+  --border-strong: #725f51;
+  --text-primary: #342c27;
+  --text-secondary: #65584f;
+  --muted: #74655b;
+  --accent: #6f4f3b;
+  --accent-hover: #4a3a30;
+  --accent-soft: #e8ddd1;
+  --accent-contrast: #ffffff;
+  --accent-shadow: rgb(111 79 59 / 16%);
+  --success: #245f43;
+  --success-soft: #e1f0e7;
+  --warning: #795514;
+  --warning-soft: #fff2cf;
+  --danger: #8f312d;
+  --danger-soft: #fbe7e4;
+  --danger-soft-hover: #f6d7d2;
+  --danger-border: #a94b45;
+  --sidebar: rgb(243 236 227 / 98%);
+  --sidebar-card: #fdfbf8;
+  --header: rgb(243 236 227 / 97%);
+  --input: #fdfbf8;
+  --input-placeholder: #74655b;
+  --focus-ring: #6f4f3b;
+  --overlay: rgb(52 44 39 / 55%);
+  --overlay-text: #ffffff;
+  --shadow: rgb(71 51 37 / 12%);
+  --shadow-card: 0 18px 50px rgb(71 51 37 / 10%);
+  color-scheme: light;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: ease;
+}
+
+:where(button, a, input, textarea, select):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.theme-toggle__dark { display: none; }
+html[data-theme="light"] .theme-toggle__light { display: none; }
+html[data-theme="light"] .theme-toggle__dark { display: inline; }
+
+.app-theme :where(
+  [class*="border-[#20302b]"], [class*="border-[#24312d]"], [class*="border-[#263244]"],
+  [class*="border-[#2a332f]"], [class*="border-[#2d3734]"], [class*="border-[#2f403b]"],
+  [class*="border-[#31445e]"], [class*="border-[#333]"]
+) { border-color: var(--border) !important; }
+
+.app-theme :where(input, textarea, select) {
+  background-color: var(--input) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+.app-theme :where(input, textarea)::placeholder {
+  color: var(--input-placeholder) !important;
+  opacity: 1;
+}
+
+.app-theme :where(input, textarea, select):focus {
+  border-color: var(--focus-ring) !important;
+}
+
+/* Compatibility layer for legacy views that still use the original dark palette. */
+html[data-theme="light"] .app-theme main {
+  background-color: var(--background) !important;
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="light"] .app-theme main > [aria-hidden="true"] {
+  opacity: .08;
+}
+
+html[data-theme="light"] .app-theme :where(
+  [class*="bg-[#050506]"], [class*="bg-[#050807]"], [class*="bg-[#050a09]"],
+  [class*="bg-[#050a08]"], [class*="bg-[#06070a]"], [class*="bg-[#06100d]"],
+  [class*="bg-[#07080b]"], [class*="bg-[#070b0a]"], [class*="bg-[#070c0a]"],
+  [class*="bg-[#07100e]"], [class*="bg-[#08100e]"], [class*="bg-[#08100f]"],
+  [class*="bg-[#09100f]"], [class*="bg-[#09110f]"], [class*="bg-[#091310]"],
+  [class*="bg-[#0a0a0a]"], [class*="bg-[#0a0f0e]"], [class*="bg-[#0b0f16]"],
+  [class*="bg-[#0b111a]"], [class*="bg-[#0b1220]"], [class*="bg-[#0d1118]"],
+  [class*="bg-[#0d121a]"], [class*="bg-[#0d1715]"], [class*="bg-[#0f172a]"]
+) { background-color: var(--surface) !important; }
+
+html[data-theme="light"] .app-theme :where(
+  [class*="bg-[#101722]"], [class*="bg-[#111827]"], [class*="bg-[#17241f]"],
+  [class*="bg-[#1a1a2a]"], [class*="bg-[#1a1a3a]"], [class*="bg-[#1e293b]"],
+  [class*="bg-[#223047]"], [class*="bg-[#242424]"], [class*="bg-[#253246]"],
+  [class*="bg-[#263244]"], [class*="bg-[#2a2a3a]"], [class*="bg-[#2f3340]"],
+  [class*="bg-[#3"], [class*="bg-[#4"]
+) { background-color: var(--card) !important; }
+
+html[data-theme="light"] .app-theme :where([class*="bg-gradient-to-"]) {
+  background-color: var(--card) !important;
+  background-image: none !important;
+}
+
+html[data-theme="light"] .app-theme :where(
+  [class*="text-white"], [class*="text-[#ededed]"], [class*="text-[#f4f7f5]"],
+  [class*="text-[#f8fafc]"], [class*="text-[#edf7f3]"], [class*="text-[#e5edf1]"],
+  [class*="text-[#e6ece9]"], [class*="text-[#dce7e2]"]
+) { color: var(--text-primary) !important; }
+
+html[data-theme="light"] .app-theme :where(
+  [class*="text-[#cbd5e1]"], [class*="text-[#cbd5d1]"], [class*="text-[#cfcfcf]"],
+  [class*="text-[#9ca3af]"], [class*="text-[#94a3b8]"], [class*="text-[#a7b8b0]"],
+  [class*="text-[#b6c4be]"], [class*="text-[#b5b8c5]"], [class*="text-[#9fb3ab]"],
+  [class*="text-[#8fa7a2]"], [class*="text-[#8da198]"]
+) { color: var(--text-secondary) !important; }
+
+html[data-theme="light"] .app-theme :where([class*="bg-[#3dd6a3]"], [class*="bg-[#22d3ee]"], [class*="bg-[#60a5fa]"]) {
+  background-color: var(--accent) !important;
+  color: var(--accent-contrast) !important;
+}
+
+html[data-theme="light"] .app-theme :where([class*="text-[#3dd6a3]"], [class*="text-[#22d3ee]"], [class*="text-[#38bdf8]"]) {
+  color: var(--accent) !important;
+}
+
+html[data-theme="light"] .app-theme :where(
+  [class*="text-[#60a5fa]"], [class*="text-[#67e8f9]"], [class*="text-[#7dd3fc]"],
+  [class*="text-[#93c5fd]"], [class*="text-[#a5f3fc]"], [class*="text-[#bae6fd]"],
+  [class*="text-[#bfdbfe]"], [class*="text-[#cffafe]"], [class*="text-[#dbeafe]"]
+) { color: var(--accent) !important; }
+
+html[data-theme="light"] .app-theme :where([class*="text-emerald"], [class*="text-green"]) {
+  color: var(--success) !important;
+}
+
+html[data-theme="light"] .app-theme :where([class*="text-amber"], [class*="text-yellow"]) {
+  color: var(--warning) !important;
+}
+
+html[data-theme="light"] .app-theme :where([class*="text-red"]) {
+  color: var(--danger) !important;
+}
+
+html[data-theme="light"] .dashboard-card {
+  background-color: var(--card) !important;
+  background-image: none !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-card) !important;
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="light"] .dashboard-card :where([class*="text-white"]) {
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="light"] .dashboard-card .animate-pulse {
+  background-color: var(--card-muted) !important;
+}
+
+html[data-theme="light"] .app-theme :where(article, section, div)[class*="shadow-black"] {
+  box-shadow: var(--shadow-card) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 @keyframes dashboard-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.dashboard-card {
-  animation: dashboard-fade-in 520ms ease both;
-}
+.dashboard-card { animation: dashboard-fade-in 520ms ease both; }
 
-.woocommerce-preview h2 { margin: 1.25rem 0 .5rem; color: #342c27; font-family: Georgia, "Times New Roman", serif; font-size: 1.35rem; line-height: 1.3; }
-.woocommerce-preview h3 { margin: 1rem 0 .35rem; color: #463a32; font-family: Georgia, "Times New Roman", serif; font-size: 1.05rem; }
+.woocommerce-preview h2 { margin: 1.25rem 0 .5rem; color: var(--text-primary); font-family: Georgia, "Times New Roman", serif; font-size: 1.35rem; line-height: 1.3; }
+.woocommerce-preview h3 { margin: 1rem 0 .35rem; color: var(--text-primary); font-family: Georgia, "Times New Roman", serif; font-size: 1.05rem; }
 .woocommerce-preview p + p, .woocommerce-preview ul + p { margin-top: .75rem; }
 .woocommerce-preview ul { margin: .55rem 0 .75rem 1.15rem; list-style: disc; }

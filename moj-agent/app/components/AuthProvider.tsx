@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [pathname, router, state.loading, state.user]);
 
   if (state.loading || (!state.user && pathname !== "/login") || (state.user && pathname === "/login")) {
-    return <div className="grid min-h-screen place-items-center bg-[#050506] text-[#9fb3ab]">Wczytywanie…</div>;
+    return <div className="grid min-h-screen place-items-center bg-[var(--background)] text-[var(--muted)]">Wczytywanie…</div>;
   }
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
